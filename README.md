@@ -167,6 +167,25 @@ build command or `build_files.sh`.
 | `DJANGO_SECURE_SSL_REDIRECT` | `True` on HTTPS |
 | `DJANGO_SECURE_HSTS_SECONDS` | `31536000` after the domain is confirmed |
 
+### Database troubleshooting
+
+- Use the **pooled Supabase URL** for the Vercel runtime `DATABASE_URL`. The direct
+  `db.<project-ref>.supabase.co:5432` host is for migrations and may be IPv6-only.
+- If the app raises `DATABASE_URL must be set ... on Vercel`, add `DATABASE_URL` to the
+  Vercel **Production** environment and redeploy. Environment changes do not apply to an
+  existing deployment.
+- If the app raises `relation "accounts_user" does not exist` or similar, migrations have not
+  run against that database. Run `migrate` with the direct or session-pooler URL.
+- If the app raises `Network is unreachable`, switch the runtime URL from the direct host to
+  the Supavisor pooler host.
+- If the app raises `password authentication failed`, check the pooler username
+  (`postgres.<project-ref>`) and URL-encode special characters in the password.
+- If you connected Vercel Postgres/Neon, Vercel may expose `POSTGRES_URL` or
+  `POSTGRES_URL_NON_POOLING` instead of `DATABASE_URL`. Map the pooled URL to
+  `DATABASE_URL` manually.
+- If you see SQLite errors on Vercel, `DATABASE_URL` is missing or still points at SQLite.
+  Vercel does not support SQLite for production.
+
 ### Supabase
 
 Use Supabase's **pooled Supavisor connection** for the Vercel runtime, and the **direct database

@@ -1,8 +1,10 @@
 """Django settings for the CS/CIS Beni-Suef Chapter session registration project."""
 
+import os
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -87,6 +89,26 @@ DATABASES = {
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
     )
 }
+
+_database_engine = DATABASES["default"]["ENGINE"]
+
+if os.environ.get("VERCEL") and _database_engine == "django.db.backends.sqlite3":
+    raise ImproperlyConfigured(
+        "DATABASE_URL must be set to a PostgreSQL connection string on Vercel."
+    )
+
+if not DEBUG and _database_engine == "django.db.backends.sqlite3":
+    raise ImproperlyConfigured(
+        "DATABASE_URL must be set to a PostgreSQL connection string when "
+        "DJANGO_DEBUG=False."
+    )
+
+if _database_engine == "django.db.backends.postgresql" and (
+    not DEBUG or os.environ.get("VERCEL")
+):
+    DATABASES["default"].setdefault("OPTIONS", {}).setdefault(
+        "sslmode", env("DB_SSLMODE", default="require")
+    )
 
 AUTH_PASSWORD_VALIDATORS = [
     {
