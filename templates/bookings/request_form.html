@@ -20,7 +20,11 @@
                 <form method="post" novalidate>
                     {% csrf_token %}
                     {{ form|crispy }}
-                    <div id="availability" class="mt-2"></div>
+                    <div id="availability" class="mt-2" aria-live="polite"></div>
+                    <div id="availability-indicator" class="htmx-indicator text-muted small mt-2">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Checking availability…
+                    </div>
                     <div class="alert alert-light border mt-4 mb-0">
                         <strong>Note:</strong> pending requests do not reserve the place. Only approved requests block a slot.
                     </div>

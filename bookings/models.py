@@ -65,7 +65,20 @@ class SessionRequest(models.Model):
             models.Index(
                 fields=["place", "status", "start_at", "end_at"],
                 name="sreq_conflict_idx",
-            )
+            ),
+            models.Index(fields=["-created_at"], name="sreq_created_idx"),
+            models.Index(
+                fields=["status", "-created_at"],
+                name="sreq_status_created_idx",
+            ),
+            models.Index(
+                fields=["requesting_unit", "-created_at"],
+                name="sreq_unit_created_idx",
+            ),
+            models.Index(
+                fields=["status", "start_at"],
+                name="sreq_status_start_idx",
+            ),
         ]
 
     def __str__(self):

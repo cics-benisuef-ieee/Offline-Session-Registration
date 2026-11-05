@@ -18,7 +18,27 @@ body {
 body {
   background: var(--brand-light);
   color: var(--brand-text);
+  display: flex;
+  flex-direction: column;
   font-family: "Open Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1 0 auto;
+}
+
+.htmx-indicator {
+  display: none;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: block;
+}
+
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
 }
 
 a {
@@ -40,8 +60,13 @@ a:hover {
 }
 
 .navbar-chapter .nav-link:hover,
-.navbar-chapter .nav-link:focus {
+.navbar-chapter .nav-link:focus,
+.navbar-chapter .nav-link.active {
   color: var(--brand-accent);
+}
+
+.navbar-chapter .nav-link.active {
+  font-weight: 700;
 }
 
 .navbar-chapter .navbar-toggler {
@@ -272,11 +297,28 @@ a:hover {
 }
 
 @media (max-width: 575.98px) {
+  .auth-card {
+    margin-top: 1.5rem;
+  }
+
   .hero {
     padding: 1.4rem;
   }
 
+  .hero .btn {
+    flex: 1 1 auto;
+  }
+
   .stat-value {
     font-size: 1.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

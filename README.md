@@ -155,6 +155,17 @@ WSGI entrypoint explicitly, and `vercel.json` gives that function a 60-second ma
 Vercel runs `collectstatic` automatically when `STATIC_ROOT` is configured, so there is no custom
 build command or `build_files.sh`.
 
+### Response speed
+
+- Put the Vercel function in the **same region as the Supabase project**. Cross-region database
+  round trips are the largest source of page latency.
+- Use the Supabase **transaction pooler** URL for the Vercel `DATABASE_URL`. Do not use the direct
+  `db.<project-ref>.supabase.co` host at runtime.
+- Keep `DJANGO_DEBUG=False` in production. WhiteNoise serves compressed static files, and
+  `GZipMiddleware` compresses HTML and JSON responses.
+- Dashboard and report status counts are aggregated in one database query, and the request list is
+  paginated.
+
 ### Required environment variables
 
 | Variable | Purpose |
@@ -192,9 +203,9 @@ build command or `build_files.sh`.
 
 ### Supabase setup
 
-Use Supabase's **pooled Supavisor connection** for the Vercel runtime, and the **direct database
-connection** for migrations. Keep Django authentication; do not enable RLS on Django tables unless
-the application is designed for it.
+Use Supabase's **pooled Supavisor connection** for the Vercel runtime, and the **session pooler**
+(or the direct connection if your network supports IPv6) for migrations. Keep Django
+authentication; do not enable RLS on Django tables unless the application is designed for it.
 
 #### 1. Create the Supabase project
 
@@ -208,7 +219,10 @@ the application is designed for it.
 You need two URLs:
 
 ```dotenv
-# Direct connection — use for migrations and seed commands.
+# Session pooler — use for migrations and seed commands (IPv4-friendly).
+SUPABASE_SESSION_URL=postgresql://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres?sslmode=require
+
+# Direct connection — alternative if your network supports IPv6.
 SUPABASE_DIRECT_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require
 
 # Transaction pooler — use as the Vercel runtime DATABASE_URL.
@@ -217,20 +231,21 @@ SUPABASE_POOLER_URL=postgresql://postgres.<project-ref>:<password>@<pooler-host>
 
 The pooler username is `postgres.<project-ref>`, not plain `postgres`.
 
-If the direct connection fails because your network or Vercel only supports IPv4, use the
-Supabase **session pooler** on port `5432` for migrations.
+If the direct connection fails with `Network is unreachable`, the project is IPv6-only on that
+network. Use the session pooler on port `5432` for migrations.
 
 #### 3. Initialize the database
 
-Run these commands from the repository with the **direct** URL:
+Run these commands from the repository with the **session pooler** URL (or the direct URL if
+your network supports IPv6):
 
 ```bash
-export SUPABASE_DIRECT_URL='postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require'
+export SUPABASE_SESSION_URL='postgresql://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres?sslmode=require'
 
-DATABASE_URL="$SUPABASE_DIRECT_URL" uv run python manage.py migrate
-DATABASE_URL="$SUPABASE_DIRECT_URL" uv run python manage.py seed_units
-DATABASE_URL="$SUPABASE_DIRECT_URL" uv run python manage.py seed_board_accounts --password '<strong-password>'
-DATABASE_URL="$SUPABASE_DIRECT_URL" uv run python manage.py createsuperuser
+DATABASE_URL="$SUPABASE_SESSION_URL" uv run python manage.py migrate
+DATABASE_URL="$SUPABASE_SESSION_URL" uv run python manage.py seed_units
+DATABASE_URL="$SUPABASE_SESSION_URL" uv run python manage.py seed_board_accounts --password '<strong-password>'
+DATABASE_URL="$SUPABASE_SESSION_URL" uv run python manage.py createsuperuser
 ```
 
 This creates the tables, the CS/CIS chapter and 11 boards, the board accounts, and the first admin

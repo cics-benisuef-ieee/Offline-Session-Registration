@@ -312,7 +312,7 @@ def get_available_slots(place, on_date):
             status=SessionRequest.Status.APPROVED,
             start_at__lt=closing,
             end_at__gt=cursor,
-        )
+        ).values_list("start_at", "end_at")
     )
 
     now = timezone.localtime()
@@ -320,8 +320,8 @@ def get_available_slots(place, on_date):
     while cursor + timedelta(minutes=SLOT_MINUTES) <= closing:
         slot_end = cursor + timedelta(minutes=SLOT_MINUTES)
         available = not any(
-            booking.start_at < slot_end and booking.end_at > cursor
-            for booking in bookings
+            booking_start < slot_end and booking_end > cursor
+            for booking_start, booking_end in bookings
         )
         if on_date == now.date() and cursor < now:
             available = False

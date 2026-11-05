@@ -45,6 +45,39 @@ def test_user_can_login_with_email(client, board_user):
     assert response.url == reverse("dashboard")
 
 
+def test_login_always_redirects_to_dashboard(client, board_user):
+    response = client.post(
+        reverse("login"),
+        {
+            "username": board_user.email,
+            "password": "test-password",
+            "next": reverse("reports"),
+        },
+    )
+
+    assert response.status_code == 302
+    assert response.url == reverse("dashboard")
+
+
+def test_authenticated_user_is_redirected_from_login(client, board_user):
+    client.force_login(board_user)
+
+    response = client.get(reverse("login"))
+
+    assert response.status_code == 302
+    assert response.url == reverse("dashboard")
+
+
+def test_logout_redirects_to_login(client, board_user):
+    client.force_login(board_user)
+
+    response = client.post(reverse("logout"), follow=True)
+
+    assert response.status_code == 200
+    assert response.redirect_chain == [(reverse("login"), 302)]
+    assert b"You have been signed out." in response.content
+
+
 def test_password_reset_page_renders(client):
     response = client.get(reverse("password_reset"))
 

@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -30,6 +30,17 @@ from .services import (
 )
 
 
+def _status_counts(queryset):
+    """Return total and per-status counts in a single database round trip."""
+    return queryset.aggregate(
+        total=Count("pk"),
+        pending=Count("pk", filter=Q(status=SessionRequest.Status.PENDING)),
+        approved=Count("pk", filter=Q(status=SessionRequest.Status.APPROVED)),
+        rejected=Count("pk", filter=Q(status=SessionRequest.Status.REJECTED)),
+        cancelled=Count("pk", filter=Q(status=SessionRequest.Status.CANCELLED)),
+    )
+
+
 def home(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
@@ -40,21 +51,16 @@ def home(request):
 def dashboard(request):
     visible = visible_requests_for(request.user)
     now = timezone.now()
-    counts = {
-        "pending": visible.filter(status=SessionRequest.Status.PENDING).count(),
-        "approved": visible.filter(status=SessionRequest.Status.APPROVED).count(),
-        "rejected": visible.filter(status=SessionRequest.Status.REJECTED).count(),
-        "cancelled": visible.filter(status=SessionRequest.Status.CANCELLED).count(),
-    }
-    recent = visible.select_related(
-        "requesting_unit", "place", "submitted_by"
-    ).order_by("-created_at")[:8]
+    counts = _status_counts(visible)
+    recent = visible.select_related("requesting_unit", "place").order_by(
+        "-created_at"
+    )[:8]
     upcoming = (
         visible.filter(
             status=SessionRequest.Status.APPROVED,
             start_at__gte=now,
         )
-        .select_related("requesting_unit", "place")
+        .select_related("place")
         .order_by("start_at")[:5]
     )
     return render(
@@ -72,7 +78,7 @@ def dashboard(request):
 @login_required
 def request_list(request):
     visible = visible_requests_for(request.user).select_related(
-        "requesting_unit", "reviewer_unit", "place", "submitted_by", "reviewer"
+        "requesting_unit", "place"
     )
 
     status = request.GET.get("status", "")
@@ -209,7 +215,7 @@ def review_queue(request):
     pending = (
         visible_requests_for(request.user)
         .filter(status=SessionRequest.Status.PENDING)
-        .select_related("requesting_unit", "reviewer_unit", "place", "submitted_by")
+        .select_related("requesting_unit", "place", "submitted_by")
         .order_by("start_at")
     )
     return render(request, "bookings/review_queue.html", {"pending": pending})
@@ -222,7 +228,7 @@ def request_review(request, pk):
 
     session_request = get_object_or_404(
         SessionRequest.objects.select_related(
-            "requesting_unit", "reviewer_unit", "place", "submitted_by"
+            "requesting_unit", "place", "submitted_by"
         ),
         pk=pk,
     )
@@ -354,7 +360,8 @@ def calendar_events(request):
             start_at__lt=end,
             end_at__gt=start,
         )
-        .select_related("requesting_unit", "place")
+        .select_related("place")
+        .only("id", "title", "start_at", "end_at", "place__name")
     )
     place_id = request.GET.get("place", "")
     if place_id.isdigit():
@@ -379,9 +386,7 @@ def reports(request):
     if not (request.user.is_superuser or request.user.is_officer):
         raise PermissionDenied
 
-    visible = visible_requests_for(request.user).select_related(
-        "requesting_unit", "reviewer_unit", "place", "submitted_by", "reviewer"
-    )
+    visible = visible_requests_for(request.user)
     status = request.GET.get("status", "")
     place_id = request.GET.get("place", "")
     unit_id = request.GET.get("unit", "")
@@ -404,13 +409,7 @@ def reports(request):
     if query:
         visible = visible.filter(Q(title__icontains=query) | Q(purpose__icontains=query))
 
-    counts = {
-        "total": visible.count(),
-        "pending": visible.filter(status=SessionRequest.Status.PENDING).count(),
-        "approved": visible.filter(status=SessionRequest.Status.APPROVED).count(),
-        "rejected": visible.filter(status=SessionRequest.Status.REJECTED).count(),
-        "cancelled": visible.filter(status=SessionRequest.Status.CANCELLED).count(),
-    }
+    counts = _status_counts(visible)
     querystring = request.GET.copy()
     querystring.pop("page", None)
 
@@ -439,7 +438,7 @@ def export_requests_csv(request):
         raise PermissionDenied
 
     visible = visible_requests_for(request.user).select_related(
-        "requesting_unit", "reviewer_unit", "place", "submitted_by", "reviewer"
+        "requesting_unit", "place", "submitted_by", "reviewer"
     )
 
     status = request.GET.get("status", "")

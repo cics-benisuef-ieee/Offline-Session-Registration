@@ -56,6 +56,7 @@ class SessionRequestForm(forms.Form):
             "hx-target": "#availability",
             "hx-trigger": "change",
             "hx-include": "#id_place,#id_date",
+            "hx-indicator": "#availability-indicator",
         }
         self.fields["place"].widget.attrs.update(availability_attrs)
         self.fields["date"].widget.attrs.update(availability_attrs)

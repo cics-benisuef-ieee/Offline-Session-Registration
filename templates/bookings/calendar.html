@@ -22,6 +22,7 @@
                 </select>
             </div>
         </div>
+        <div id="calendar-loading" class="small text-muted mb-2">Loading sessions…</div>
         <div id="calendar"></div>
     </div>
 </div>
@@ -32,11 +33,15 @@
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const calendarEl = document.getElementById("calendar");
+        const loadingEl = document.getElementById("calendar-loading");
         const placeFilter = document.getElementById("placeFilter");
         const eventsUrl = "{% url 'calendar_events' %}";
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: "dayGridMonth",
             height: "auto",
+            loading: function (isLoading) {
+                loadingEl.classList.toggle("d-none", !isLoading);
+            },
             headerToolbar: {
                 left: "prev,next today",
                 center: "title",
