@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block title %}Review {{ session_request.title }} · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Review request</h1>
+        <p class="text-muted mb-0">{{ session_request.title }} · {{ session_request.requesting_unit }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'review_queue' %}">Back to queue</a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card mb-4">
+            <div class="card-header">Request summary</div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-sm-6">
+                        <div class="meta-label">Place</div>
+                        <div class="meta-value">{{ session_request.place }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="meta-label">Requesting unit</div>
+                        <div class="meta-value">{{ session_request.requesting_unit }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="meta-label">Date</div>
+                        <div class="meta-value">{{ session_request.start_at|date:"l, F j, Y" }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="meta-label">Time</div>
+                        <div class="meta-value">{{ session_request.start_at|date:"H:i" }}–{{ session_request.end_at|date:"H:i" }} ({{ session_request.duration_minutes }} min)</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="meta-label">Purpose</div>
+                        <div class="mt-1" style="white-space:pre-line;">{{ session_request.purpose }}</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="meta-label">Submitted by</div>
+                        <div class="meta-value">{{ session_request.submitted_by }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if conflicts %}
+            <div class="alert alert-warning">
+                <div class="fw-bold mb-1">This request conflicts with approved bookings</div>
+                <ul class="mb-0">
+                    {% for conflict in conflicts %}
+                        <li>
+                            <a href="{% url 'request_detail' conflict.pk %}">{{ conflict.title }}</a>
+                            — {{ conflict.requesting_unit }},
+                            {{ conflict.start_at|date:"M j, H:i" }}–{{ conflict.end_at|date:"H:i" }}
+                        </li>
+                    {% endfor %}
+                </ul>
+                <div class="small mt-2">Approval will be blocked until the conflict is resolved.</div>
+            </div>
+        {% else %}
+            <div class="alert alert-success">No approved bookings overlap this request.</div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card mb-4">
+            <div class="card-header">Approve</div>
+            <div class="card-body">
+                <p class="text-muted">Approving reserves the place for this time and notifies the requester.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="approve">
+                    <button class="btn btn-success w-100" type="submit"
+                            onclick="return confirm('Approve this request and reserve the place?');">Approve request</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Reject</div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reject">
+                    {{ reject_form|crispy }}
+                    <button class="btn btn-outline-danger w-100" type="submit"
+                            onclick="return confirm('Reject this request?');">Reject request</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% if error %}
+    <div class="alert alert-light border mb-0">{{ error }}</div>
+{% elif slots %}
+    <div class="card bg-light border-0">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                <span class="fw-semibold">{{ place }} · {{ date|date:"l, F j" }}</span>
+                <span class="small text-muted">30-minute slots · Africa/Cairo</span>
+            </div>
+            <div>
+                {% for slot in slots %}
+                    <span class="slot-pill {% if slot.available %}available{% else %}unavailable{% endif %}">
+                        {{ slot.start|slice:"11:16" }}–{{ slot.end|slice:"11:16" }}
+                    </span>
+                {% endfor %}
+            </div>
+            <div class="small text-muted mt-2">Green slots are free. Red slots overlap an approved booking.</div>
+        </div>
+    </div>
+{% else %}
+    <div class="alert alert-light border mb-0">
+        No bookable slots are available for {{ place|default:"this place" }}{% if date %} on {{ date|date:"l, F j" }}{% endif %}.
+        The place may be closed, outside opening hours, or fully booked.
+    </div>
+{% endif %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Requests · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Session requests</h1>
+        <p class="text-muted mb-0">{{ page_obj.paginator.count }} request{{ page_obj.paginator.count|pluralize }} visible to your account.</p>
+    </div>
+    <a class="btn btn-brand" href="{% url 'request_create' %}">New request</a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" for="q">Search</label>
+                <input class="form-control" id="q" name="q" value="{{ query }}" placeholder="Title or purpose">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="status">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All</option>
+                    {% for value, label in statuses %}
+                        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="place">Place</label>
+                <select class="form-select" id="place" name="place">
+                    <option value="">All places</option>
+                    {% for place in places %}
+                        <option value="{{ place.pk }}" {% if selected_place == place.pk|stringformat:"s" %}selected{% endif %}>{{ place }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if is_reviewer %}
+                <div class="col-md-2">
+                    <label class="form-label" for="unit">Unit</label>
+                    <select class="form-select" id="unit" name="unit">
+                        <option value="">All units</option>
+                        {% for unit in units %}
+                            <option value="{{ unit.pk }}" {% if selected_unit == unit.pk|stringformat:"s" %}selected{% endif %}>{{ unit }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+            <div class="col-md-2">
+                <label class="form-label" for="date_from">From</label>
+                <input class="form-control" type="date" id="date_from" name="date_from" value="{{ date_from }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="date_to">To</label>
+                <input class="form-control" type="date" id="date_to" name="date_to" value="{{ date_to }}">
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button class="btn btn-brand" type="submit">Filter</button>
+                <a class="btn btn-outline-secondary" href="{% url 'request_list' %}">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0">
+            <thead>
+            <tr>
+                <th>Title</th>
+                <th>Unit</th>
+                <th>Place</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in page_obj %}
+                <tr>
+                    <td>
+                        <a class="fw-semibold" href="{% url 'request_detail' item.pk %}">{{ item.title }}</a>
+                        <div class="small text-muted">{{ item.purpose|truncatechars:70 }}</div>
+                    </td>
+                    <td>{{ item.requesting_unit }}</td>
+                    <td>{{ item.place }}</td>
+                    <td>{{ item.start_at|date:"M j, Y H:i" }}</td>
+                    <td>{{ item.end_at|date:"H:i" }}</td>
+                    <td>{% include "bookings/partials/status_badge.html" with status=item.status label=item.get_status_display %}</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-brand" href="{% url 'request_detail' item.pk %}">Open</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="text-muted text-center py-4">No requests match these filters.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-3" aria-label="Request pagination">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                <a class="page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Previous</a>
+            </li>
+            <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+            <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                <a class="page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Next</a>
+            </li>
+        </ul>
+    </nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block title %}{{ session_request.title }} · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <h1 class="h3 mb-0">{{ session_request.title }}</h1>
+            {% include "bookings/partials/status_badge.html" with status=session_request.status label=session_request.get_status_display %}
+        </div>
+        <p class="text-muted mb-0">Request {{ session_request.pk }}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'request_list' %}">Back to requests</a>
+        {% if can_review and session_request.status == "pending" %}
+            <a class="btn btn-brand" href="{% url 'request_review' session_request.pk %}">Review request</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">Request details</div>
+            <div class="card-body">
+                <div class="row g-4">
+                    <div class="col-sm-6">
+                        <div class="meta-label">Requesting unit</div>
+                        <div class="meta-value">{{ session_request.requesting_unit }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="meta-label">Reviewer unit</div>
+                        <div class="meta-value">{{ session_request.reviewer_unit }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="meta-label">Place</div>
+                        <div class="meta-value">{{ session_request.place }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="meta-label">Submitted by</div>
+                        <div class="meta-value">{{ session_request.submitted_by }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="meta-label">Date</div>
+                        <div class="meta-value">{{ session_request.start_at|date:"l, F j, Y" }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="meta-label">Time</div>
+                        <div class="meta-value">
+                            {{ session_request.start_at|date:"H:i" }}–{{ session_request.end_at|date:"H:i" }}
+                            <span class="text-muted">({{ session_request.duration_minutes }} min)</span>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="meta-label">Purpose</div>
+                        <div class="mt-1" style="white-space:pre-line;">{{ session_request.purpose }}</div>
+                    </div>
+                    {% if session_request.decision_reason %}
+                        <div class="col-12">
+                            <div class="meta-label">Decision reason</div>
+                            <div class="mt-1">{{ session_request.decision_reason }}</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if can_review and conflicts %}
+            <div class="alert alert-warning">
+                <div class="fw-bold mb-1">Approved conflicts at this place</div>
+                <ul class="mb-0">
+                    {% for conflict in conflicts %}
+                        <li>
+                            <a href="{% url 'request_detail' conflict.pk %}">{{ conflict.title }}</a>
+                            — {{ conflict.requesting_unit }},
+                            {{ conflict.start_at|date:"M j, H:i" }}–{{ conflict.end_at|date:"H:i" }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-header">Status history</div>
+            <div class="card-body">
+                <div class="timeline">
+                    {% for entry in history %}
+                        <div class="timeline-item">
+                            <div class="d-flex flex-wrap justify-content-between gap-2">
+                                <span class="fw-semibold">
+                                    {% if entry.from_status %}{{ entry.from_status|capfirst }} → {% endif %}{{ entry.to_status|capfirst }}
+                                </span>
+                                <span class="small text-muted">{{ entry.created_at|date:"M j, Y H:i" }}</span>
+                            </div>
+                            <div class="small text-muted">
+                                {{ entry.changed_by|default:"System" }}
+                                {% if entry.reason %} · {{ entry.reason }}{% endif %}
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-muted mb-0">No status history recorded.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header">Booking state</div>
+            <div class="card-body">
+                {% if session_request.status == "pending" %}
+                    <p class="mb-0 text-muted">Pending requests do not block the place. An officer must approve this request before the slot is reserved.</p>
+                {% elif session_request.status == "approved" %}
+                    <p class="mb-0 text-muted">This approved session blocks the place for the requested time.</p>
+                {% elif session_request.status == "rejected" %}
+                    <p class="mb-0 text-muted">This request was rejected and does not block the place.</p>
+                {% else %}
+                    <p class="mb-0 text-muted">This request was cancelled and does not block the place.</p>
+                {% endif %}
+                {% if session_request.reviewer %}
+                    <hr>
+                    <div class="meta-label">Reviewed by</div>
+                    <div class="meta-value">{{ session_request.reviewer }}</div>
+                    <div class="small text-muted">{{ session_request.reviewed_at|date:"M j, Y H:i" }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if can_cancel and session_request.status == "pending" or can_cancel and session_request.status == "approved" %}
+            <div class="card">
+                <div class="card-header">Cancel request</div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'request_cancel' session_request.pk %}">
+                        {% csrf_token %}
+                        {{ cancel_form|crispy }}
+                        <button class="btn btn-outline-danger w-100" type="submit"
+                                onclick="return confirm('Cancel this session request?');">Cancel request</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Calendar · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Approved sessions</h1>
+        <p class="text-muted mb-0">Only approved requests appear on the calendar. Pending requests do not block a place.</p>
+    </div>
+    <a class="btn btn-brand" href="{% url 'request_create' %}">New request</a>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label" for="placeFilter">Place</label>
+                <select class="form-select" id="placeFilter">
+                    <option value="">All places</option>
+                    {% for place in places %}
+                        <option value="{{ place.pk }}">{{ place }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div id="calendar"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const calendarEl = document.getElementById("calendar");
+        const placeFilter = document.getElementById("placeFilter");
+        const eventsUrl = "{% url 'calendar_events' %}";
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: "dayGridMonth",
+            height: "auto",
+            headerToolbar: {
+                left: "prev,next today",
+                center: "title",
+                right: "dayGridMonth,timeGridWeek"
+            },
+            events: function (info, successCallback, failureCallback) {
+                const url = new URL(eventsUrl, window.location.origin);
+                url.searchParams.set("start", info.startStr);
+                url.searchParams.set("end", info.endStr);
+                if (placeFilter.value) {
+                    url.searchParams.set("place", placeFilter.value);
+                }
+                fetch(url)
+                    .then(function (response) { return response.json(); })
+                    .then(successCallback)
+                    .catch(failureCallback);
+            },
+            eventClick: function (info) {
+                if (info.event.url) {
+                    info.jsEvent.preventDefault();
+                    window.location.href = info.event.url;
+                }
+            }
+        });
+        calendar.render();
+        placeFilter.addEventListener("change", function () {
+            calendar.refetchEvents();
+        });
+    });
+</script>
+{% endblock %}

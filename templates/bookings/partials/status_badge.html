@@ -1,0 +1,11 @@
+{% if status == "pending" %}
+    <span class="badge badge-status-pending">{{ label|default:"Pending" }}</span>
+{% elif status == "approved" %}
+    <span class="badge badge-status-approved">{{ label|default:"Approved" }}</span>
+{% elif status == "rejected" %}
+    <span class="badge badge-status-rejected">{{ label|default:"Rejected" }}</span>
+{% elif status == "cancelled" %}
+    <span class="badge badge-status-cancelled">{{ label|default:"Cancelled" }}</span>
+{% else %}
+    <span class="badge bg-secondary">{{ label|default:status }}</span>
+{% endif %}

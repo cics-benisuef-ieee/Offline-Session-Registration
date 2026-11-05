@@ -1,0 +1,36 @@
+[project]
+name = "offline-session-registration"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "crispy-bootstrap5>=2026.9",
+    "django>=5.2,<6",
+    "django-crispy-forms>=2.7",
+    "django-environ>=0.14.0",
+    "psycopg[binary]>=3.3.8",
+    "whitenoise>=6.12.0",
+]
+
+[dependency-groups]
+dev = [
+    "factory-boy>=3.3.3",
+    "pytest>=9.2.0",
+    "pytest-django>=4.14.0",
+    "ruff>=0.17.3",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py", "*_test.py"]
+testpaths = ["tests"]
+
+[tool.vercel]
+entrypoint = "config.wsgi:application"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

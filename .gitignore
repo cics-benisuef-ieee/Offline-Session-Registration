@@ -62,6 +62,12 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Collected static files and Vercel metadata
+staticfiles/*
+!staticfiles/.gitkeep
+.vercel/
+media/
+
 # Flask stuff:
 instance/
 .webassets-cache
@@ -151,6 +157,8 @@ activemq-data/
 
 # Environments
 .env
+.env.local
+.env.*.local
 .envrc
 .venv
 env/

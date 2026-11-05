@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Review queue · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Review queue</h1>
+        <p class="text-muted mb-0">All pending requests across every unit. Approving a request reserves the place globally.</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'request_list' %}?status=pending">Open filtered list</a>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table mb-0">
+            <thead>
+            <tr>
+                <th>Title</th>
+                <th>Unit</th>
+                <th>Place</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Submitted by</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in pending %}
+                <tr>
+                    <td>
+                        <a class="fw-semibold" href="{% url 'request_detail' item.pk %}">{{ item.title }}</a>
+                        <div class="small text-muted">{{ item.purpose|truncatechars:80 }}</div>
+                    </td>
+                    <td>{{ item.requesting_unit }}</td>
+                    <td>{{ item.place }}</td>
+                    <td>{{ item.start_at|date:"M j, Y" }}</td>
+                    <td>{{ item.start_at|date:"H:i" }}–{{ item.end_at|date:"H:i" }}</td>
+                    <td>{{ item.submitted_by }}</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-brand" href="{% url 'request_review' item.pk %}">Review</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="text-muted text-center py-5">The queue is clear.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
