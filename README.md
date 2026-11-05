@@ -1,35 +1,35 @@
-# Offline Session Registration
+# CS/CIS Beni-Suef Chapter Session Registration
 
-A Django application for registering and approving offline IEEE session places. It replaces
-informal room-booking messages with a single request queue, a global conflict check, and a
-calendar/reporting view.
+A Django application for registering and approving offline session places for the
+**CS/CIS Beni-Suef Chapter**. It replaces informal room-booking messages with a single request
+queue, a global conflict check, and a calendar/reporting view.
 
 The application is intentionally a **booking system only**. It does not include public attendee
 registration, QR tickets, check-in, or payments.
 
 ## What it does
 
-- Units are modelled as a **branch**, **chapters**, or **boards**. The 11 CS/CIS boards are
-  seeded under the CS/CIS chapter.
+- The seeded entity is the **CS/CIS Beni-Suef Chapter**, with the 11 chapter boards parented to
+  it. The `Unit` model still supports branch, chapter, and board kinds for future use.
 - Each board has exactly one board account. Board accounts can submit requests for their own
   board and see only their own board's requests.
-- Officers of any entity can submit requests for their own entity, see every request, and
-  approve or reject any request, including their own.
-- Admins can manage units, accounts, places, and closures through Django admin. Officers and
-  admins can filter the request register at `/reports/` and download a CSV; board accounts cannot
-  export reports.
+- Chapter officers can submit requests for the chapter, see every request, and approve or reject
+  any request, including their own.
+- Admins can manage units, accounts, places, and closures through Django admin. Chapter officers
+  and admins can filter the request register at `/reports/` and download a CSV; board accounts
+  cannot export reports.
 - Users can request a password reset from the sign-in page; reset links are sent through the
   configured email backend.
 - Pending requests do **not** block a place. Only approved requests block a place.
 - Approval checks for overlapping approved requests globally, across every unit.
-- All times are handled in `Africa/Cairo`; the UI uses the IEEE master brand palette.
+- All times are handled in `Africa/Cairo`; the UI uses the CS/CIS chapter palette.
 
 ## Stack
 
 - Django 5.2 LTS
 - PostgreSQL in production; SQLite for local development and tests
 - Django templates, Bootstrap 5, HTMX, Alpine.js, FullCalendar
-- Open Sans and the IEEE brand colour palette
+- Open Sans and the CS/CIS chapter colour palette
 - `uv` for dependency management
 - Vercel for hosting
 
@@ -42,6 +42,7 @@ uv sync
 cp .env.example .env
 uv run python manage.py migrate
 uv run python manage.py seed_units
+uv run python manage.py seed_board_accounts --password "<strong-password>"
 uv run python manage.py createsuperuser
 uv run python manage.py runserver
 ```
@@ -54,10 +55,23 @@ The seed command is idempotent:
 uv run python manage.py seed_units
 ```
 
-It creates `Branch`, `CS/CIS`, `WIE`, and the 11 boards:
+It creates `CS/CIS Beni-Suef Chapter` and the 11 boards:
 
 Agentic AI, Machine Learning, Data Analysis, Red-Team, Network, Mechanical Design, Embedded
 Systems, Front-end, Back-end, Flutter, UI/UX.
+
+On an existing database, legacy branch and affinity-group units from the earlier seed are
+deactivated.
+
+Create or refresh the board accounts with:
+
+```bash
+uv run python manage.py seed_board_accounts --password "<strong-password>"
+```
+
+The command creates one account per active board. Emails are generated from the board name by
+lowercasing it and replacing spaces or slashes with hyphens, for example
+`ui-ux@cics.benisuef.ieee`. Re-running the command updates the existing accounts.
 
 ## Tests and linting
 
@@ -72,8 +86,8 @@ uv run ruff check .
 | Account | Can submit for | Sees | Can approve/reject |
 | --- | --- | --- | --- |
 | Board account | Its own board | Its own board's requests | No |
-| Officer | Its own branch/chapter | All requests | Yes, including own |
-| Admin (`is_superuser`) | Any unit | All requests | Yes |
+| Chapter officer | The chapter | All requests | Yes, including own |
+| Admin (`is_superuser`) | The chapter or any board | All requests | Yes |
 
 A treasurer is an officer, not a separate role. There is no public attendee account type.
 
@@ -183,13 +197,13 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 
 ```text
 accounts/        Custom user model, account types, admin
-units/           Branch/chapter/board model and seed command
+units/           Unit model and chapter/board seed command
 places/          Rooms and closure dates
 bookings/        Requests, status history, services, forms, views
 notifications/   Transactional email helpers
 config/          Django settings, URLs, ASGI/WSGI entrypoints
 templates/       Shared and booking templates
-static/css/      IEEE theme
+static/css/      CS/CIS chapter theme
 tests/           Service and view tests
 ```
 

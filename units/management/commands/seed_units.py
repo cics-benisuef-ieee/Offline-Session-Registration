@@ -32,6 +32,7 @@ class Command(BaseCommand):
                 "is_active": True,
             },
         )
+        # Deactivate units left behind by the previous branch-level seed.
         Unit.objects.filter(slug__in=["branch", "wie"]).update(is_active=False)
 
         for board_name in BOARDS:

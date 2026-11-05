@@ -1,4 +1,4 @@
-"""Django settings for the Offline Session Registration project."""
+"""Django settings for the CS/CIS Beni-Suef Chapter session registration project."""
 
 from pathlib import Path
 

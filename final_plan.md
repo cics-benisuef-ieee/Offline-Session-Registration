@@ -48,8 +48,11 @@ command creates only the chapter and its boards:
 - `CS/CIS Beni-Suef Chapter` (`chapter`)
 - The 11 boards above, each parented to the chapter.
 
-The seed command is idempotent. On an existing database, legacy `branch` and `wie` units
-from the old seed are deactivated; the chapter unit keeps the `cs-cis` slug so existing
+Board accounts are created with `seed_board_accounts --password <password>`. Emails use the
+`<board-slug>@cics.benisuef.ieee` pattern, for example `ui-ux@cics.benisuef.ieee`.
+
+The seed command is idempotent. On an existing database, legacy branch and affinity-group
+units from the old seed are deactivated; the chapter unit keeps the `cs-cis` slug so existing
 relationships continue to work.
 
 ## 5. Booking rules

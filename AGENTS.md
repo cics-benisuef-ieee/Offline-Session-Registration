@@ -2,7 +2,7 @@
 
 ## Repository state
 
-- Django 5.2 LTS application for IEEE offline session booking.
+- Django 5.2 LTS application for CS/CIS Beni-Suef Chapter offline session booking.
 - Production database target: PostgreSQL (Vercel-compatible managed provider).
 - Local/test database: SQLite through `DATABASE_URL` fallback.
 - Package manager: `uv`; `pyproject.toml` and `uv.lock` are authoritative.
@@ -16,6 +16,7 @@ uv sync
 cp .env.example .env
 uv run python manage.py migrate
 uv run python manage.py seed_units
+uv run python manage.py seed_board_accounts --password "<strong-password>"
 uv run python manage.py createsuperuser
 uv run python manage.py runserver
 ```
@@ -38,12 +39,13 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 
 - `accounts`: custom `User` (`email` login, `full_name`, `unit`, `account_type`).
   Account types are `OFFICER` and `BOARD_ACCOUNT`; admin is `is_superuser`/`is_staff`.
-- `units`: `Unit` with kinds `branch`, `chapter`, `board`; boards are parented to CS/CIS.
+- `units`: `Unit` with kinds `branch`, `chapter`, `board`; the seed creates
+  `CS/CIS Beni-Suef Chapter` and parents the 11 boards to it.
 - `places`: predefined rooms plus closure date ranges.
 - `bookings`: `SessionRequest` (UUID), `RequestStatusHistory`, service layer, forms, views.
 - `notifications`: email helpers; sends are deferred with `transaction.on_commit()`.
 - `templates/`: Django templates using Bootstrap 5, HTMX, Alpine.js, FullCalendar.
-- `static/css/theme.css`: IEEE palette and shared UI styles.
+- `static/css/theme.css`: CS/CIS chapter palette and shared UI styles.
 
 ## Invariants
 
@@ -54,7 +56,8 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
   requesting unit or reviewer unit.
 - `reviewer_unit` is a reporting snapshot (board parent or entity unit), not a visibility filter.
 - Board accounts see only their own board's requests and cannot approve/reject.
-- Officers and admins see all requests and can approve/reject any request, including their own.
+- Chapter officers and admins see all requests and can approve/reject any request, including
+  their own.
 - Rejected and cancelled requests are terminal.
 - Cancelling an approved request requires a reason.
 - Start times align to 30-minute slots; durations are 30–240 minutes in 30-minute increments.

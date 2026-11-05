@@ -7,8 +7,8 @@ pytestmark = pytest.mark.django_db
 
 
 def test_seed_units_creates_chapter_and_boards():
-    Unit.objects.create(name="Branch", slug="branch", kind=Unit.Kind.BRANCH)
-    Unit.objects.create(name="WIE", slug="wie", kind=Unit.Kind.CHAPTER)
+    Unit.objects.create(name="Legacy Branch", slug="branch", kind=Unit.Kind.BRANCH)
+    Unit.objects.create(name="Legacy Affinity Group", slug="wie", kind=Unit.Kind.CHAPTER)
 
     call_command("seed_units")
 
