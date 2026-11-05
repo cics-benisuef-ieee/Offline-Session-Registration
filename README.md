@@ -179,8 +179,9 @@ build command or `build_files.sh`.
   existing deployment.
 - If the app raises `relation "accounts_user" does not exist` or similar, migrations have not
   run against that database. Run `migrate` with the direct or session-pooler URL.
-- If the app raises `Network is unreachable`, switch the runtime URL from the direct host to
-  the Supavisor pooler host.
+- If the app raises `Network is unreachable` or `Cannot assign requested address` and the log
+  shows an IPv6 address for `db.<project-ref>.supabase.co`, Vercel is still using the direct
+  URL. Change the Vercel `DATABASE_URL` to the Supavisor pooler URL and redeploy.
 - If the app raises `password authentication failed`, check the pooler username
   (`postgres.<project-ref>`) and URL-encode special characters in the password.
 - If you connected Vercel Postgres/Neon, Vercel may expose `POSTGRES_URL` or
