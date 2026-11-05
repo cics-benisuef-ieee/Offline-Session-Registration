@@ -147,6 +147,9 @@ Supabase, Neon, or another managed provider.
 
 4. Create the first admin account and seed units using the same direct database URL.
 
+For a complete Supabase walkthrough, including connection strings and linking it to Vercel, see
+[Supabase setup](#supabase-setup).
+
 Vercel detects `manage.py` and the Django entrypoint automatically. `pyproject.toml` sets the
 WSGI entrypoint explicitly, and `vercel.json` gives that function a 60-second maximum duration.
 Vercel runs `collectstatic` automatically when `STATIC_ROOT` is configured, so there is no custom
@@ -186,11 +189,51 @@ build command or `build_files.sh`.
 - If you see SQLite errors on Vercel, `DATABASE_URL` is missing or still points at SQLite.
   Vercel does not support SQLite for production.
 
-### Supabase
+### Supabase setup
 
 Use Supabase's **pooled Supavisor connection** for the Vercel runtime, and the **direct database
 connection** for migrations. Keep Django authentication; do not enable RLS on Django tables unless
 the application is designed for it.
+
+#### 1. Create the Supabase project
+
+1. Create a project at <https://supabase.com/dashboard>.
+2. Open **Project Settings → Database** and copy the connection details.
+3. Keep the database password somewhere safe. If it contains `@`, `#`, `%`, or another URL
+   special character, URL-encode it in `DATABASE_URL`.
+
+#### 2. Get both connection strings
+
+You need two URLs:
+
+```dotenv
+# Direct connection — use for migrations and seed commands.
+SUPABASE_DIRECT_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require
+
+# Transaction pooler — use as the Vercel runtime DATABASE_URL.
+SUPABASE_POOLER_URL=postgresql://postgres.<project-ref>:<password>@<pooler-host>:6543/postgres?sslmode=require
+```
+
+The pooler username is `postgres.<project-ref>`, not plain `postgres`.
+
+If the direct connection fails because your network or Vercel only supports IPv4, use the
+Supabase **session pooler** on port `5432` for migrations.
+
+#### 3. Initialize the database
+
+Run these commands from the repository with the **direct** URL:
+
+```bash
+export SUPABASE_DIRECT_URL='postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require'
+
+DATABASE_URL="$SUPABASE_DIRECT_URL" uv run python manage.py migrate
+DATABASE_URL="$SUPABASE_DIRECT_URL" uv run python manage.py seed_units
+DATABASE_URL="$SUPABASE_DIRECT_URL" uv run python manage.py seed_board_accounts --password '<strong-password>'
+DATABASE_URL="$SUPABASE_DIRECT_URL" uv run python manage.py createsuperuser
+```
+
+This creates the tables, the CS/CIS chapter and 11 boards, the board accounts, and the first admin
+account.
 
 The migration that creates the exclusion constraint runs:
 
@@ -199,9 +242,56 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 ```
 
 If your database role cannot create extensions, enable `btree_gist` from the Supabase dashboard
-before deploying. On SQLite the constraint migration is skipped; the service-layer conflict check
-still applies. If you are applying the migration to an existing database, resolve any overlapping
-approved rows first, because the exclusion constraint will reject them.
+before running migrations. On SQLite the constraint migration is skipped; the service-layer
+conflict check still applies. If you are applying the migration to an existing database, resolve
+any overlapping approved rows first, because the exclusion constraint will reject them.
+
+#### 4. Link Supabase to Vercel
+
+In Vercel, open **Project → Settings → Environment Variables** and add the pooled URL for both
+**Production** and **Preview**:
+
+```dotenv
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@<pooler-host>:6543/postgres?sslmode=require
+```
+
+Add the remaining production variables:
+
+```dotenv
+DJANGO_SECRET_KEY=<long-random-secret>
+DJANGO_DEBUG=False
+DJANGO_ALLOWED_HOSTS=.vercel.app,your-domain.com
+CSRF_TRUSTED_ORIGINS=https://*.vercel.app,https://your-domain.com
+DEFAULT_FROM_EMAIL=sessions@your-domain.com
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.your-provider.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=...
+EMAIL_HOST_PASSWORD=...
+EMAIL_USE_TLS=True
+DJANGO_SECURE_COOKIES=True
+DJANGO_SECURE_SSL_REDIRECT=True
+DJANGO_SECURE_HSTS_SECONDS=31536000
+```
+
+Then redeploy. Environment variable changes do not apply to an existing deployment.
+
+If you use the Vercel Supabase integration or Vercel Postgres/Neon, Vercel may create
+`POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`, or `SUPABASE_*` variables instead of `DATABASE_URL`.
+Map the **pooled** URL to `DATABASE_URL` manually.
+
+#### 5. Verify the link
+
+After redeploying:
+
+1. Open `/login/` and sign in with the admin account.
+2. Open `/admin/` and confirm the chapter, boards, and board accounts exist.
+3. Create at least one place and one closure date if needed.
+4. Sign in as a board account and confirm it can submit a request but cannot open `/review/` or
+   `/reports/`.
+
+If the deployment fails, check the Vercel function logs for `django.db.utils.*` and see
+[Database troubleshooting](#database-troubleshooting).
 
 ## Dependency files
 
