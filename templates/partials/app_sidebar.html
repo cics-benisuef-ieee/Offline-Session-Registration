@@ -1,0 +1,53 @@
+{% load static %}
+<aside class="app-sidebar" aria-label="Primary navigation">
+    <span class="sidebar-stripe" aria-hidden="true"></span>
+
+    <button class="sidebar-close d-lg-none" type="button" data-bs-dismiss="offcanvas" aria-label="Close navigation">
+        <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+
+    <div class="sidebar-brand">
+        <img src="{% static 'images/logo.png' %}" alt="CS/CIS Beni-Suef Chapter logo" class="sidebar-logo">
+        <div class="min-w-0">
+            <p class="sidebar-eyebrow">CS/CIS Beni-Suef Chapter</p>
+            <p class="sidebar-title">Session Booking</p>
+        </div>
+    </div>
+
+    {% with current=request.resolver_match.url_name %}
+    <nav class="sidebar-nav" aria-label="Main">
+        <a class="nav-link{% if current == 'dashboard' %} active{% endif %}" href="{% url 'dashboard' %}"
+           {% if current == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
+        <a class="nav-link{% if current == 'request_list' or current == 'request_detail' %} active{% endif %}"
+           href="{% url 'request_list' %}"
+           {% if current == 'request_list' or current == 'request_detail' %}aria-current="page"{% endif %}>Requests</a>
+        <a class="nav-link{% if current == 'request_create' %} active{% endif %}" href="{% url 'request_create' %}"
+           {% if current == 'request_create' %}aria-current="page"{% endif %}>New request</a>
+        {% if user.is_officer %}
+            <a class="nav-link{% if current == 'review_queue' or current == 'request_review' %} active{% endif %}"
+               href="{% url 'review_queue' %}"
+               {% if current == 'review_queue' or current == 'request_review' %}aria-current="page"{% endif %}>Review</a>
+        {% endif %}
+        <a class="nav-link{% if current == 'calendar' %} active{% endif %}" href="{% url 'calendar' %}"
+           {% if current == 'calendar' %}aria-current="page"{% endif %}>Calendar</a>
+        {% if user.is_officer %}
+            <a class="nav-link{% if current == 'reports' %} active{% endif %}" href="{% url 'reports' %}"
+               {% if current == 'reports' %}aria-current="page"{% endif %}>Reports</a>
+        {% endif %}
+        {% if user.is_superuser %}
+            <a class="nav-link{% if '/admin/' in request.path %} active{% endif %}" href="/admin/"
+               {% if '/admin/' in request.path %}aria-current="page"{% endif %}>Admin</a>
+        {% endif %}
+    </nav>
+    {% endwith %}
+
+    <div class="sidebar-user">
+        <p class="sidebar-user-name">{{ user.full_name|default:user.email }}</p>
+        <p class="sidebar-user-email">{{ user.email }}</p>
+        {% if user.unit %}<p class="sidebar-user-unit">{{ user.unit }}</p>{% endif %}
+        <form method="post" action="{% url 'logout' %}" class="m-0">
+            {% csrf_token %}
+            <button class="sidebar-signout" type="submit">Sign out</button>
+        </form>
+    </div>
+</aside>

@@ -1,17 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Reports · CS/CIS Session Registration{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-    <div>
-        <h1 class="h3 mb-1">Reports</h1>
-        <p class="text-muted mb-0">Filter the request register, then download a CSV for officers and admin.</p>
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <h1 class="page-title">Reports</h1>
+            <p class="page-subtitle">Filter the request register, then download a CSV for officers and admin.</p>
+        </div>
     </div>
-    <a class="btn btn-brand" href="{% url 'export_requests_csv' %}{% if querystring %}?{{ querystring }}{% endif %}">
-        Download CSV
-    </a>
+    <div class="page-actions">
+        <a class="btn btn-accent" href="{% url 'export_requests_csv' %}{% if querystring %}?{{ querystring }}{% endif %}">
+            <i class="bi bi-download" aria-hidden="true"></i> Download CSV
+        </a>
+    </div>
 </div>
 
-<div class="card mb-4">
+<div class="card filter-card mb-4">
     <div class="card-body">
         <form method="get" class="row g-3 align-items-end">
             <div class="col-md-3">
@@ -21,7 +26,7 @@
             <div class="col-md-2">
                 <label class="form-label" for="status">Status</label>
                 <select class="form-select" id="status" name="status">
-                    <option value="">All</option>
+                    <option value="">All statuses</option>
                     {% for value, label in statuses %}
                         <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
@@ -53,54 +58,56 @@
                 <label class="form-label" for="date_to">To</label>
                 <input class="form-control" type="date" id="date_to" name="date_to" value="{{ date_to }}">
             </div>
-            <div class="col-12 d-flex gap-2">
-                <button class="btn btn-brand" type="submit">Apply filters</button>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button class="btn btn-brand" type="submit">
+                    <i class="bi bi-funnel" aria-hidden="true"></i> Apply filters
+                </button>
                 <a class="btn btn-outline-secondary" href="{% url 'reports' %}">Reset</a>
             </div>
         </form>
     </div>
 </div>
 
-<div class="row g-3">
-    <div class="col-6 col-lg">
-        <div class="card stat-card h-100">
-            <div class="card-body">
-                <div class="stat-value">{{ counts.total }}</div>
-                <div class="meta-label mt-2">Total</div>
-            </div>
+<div class="stat-grid stat-grid--five">
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Total</p>
+            <span class="stat-icon tone-navy" aria-hidden="true"><i class="bi bi-collection"></i></span>
         </div>
+        <p class="stat-value">{{ counts.total }}</p>
+        <p class="stat-hint">Matching the filters</p>
     </div>
-    <div class="col-6 col-lg">
-        <div class="card stat-card pending h-100">
-            <div class="card-body">
-                <div class="stat-value">{{ counts.pending }}</div>
-                <div class="meta-label mt-2">Pending</div>
-            </div>
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Pending</p>
+            <span class="stat-icon tone-gold" aria-hidden="true"><i class="bi bi-hourglass-split"></i></span>
         </div>
+        <p class="stat-value">{{ counts.pending }}</p>
+        <p class="stat-hint">Awaiting review</p>
     </div>
-    <div class="col-6 col-lg">
-        <div class="card stat-card approved h-100">
-            <div class="card-body">
-                <div class="stat-value">{{ counts.approved }}</div>
-                <div class="meta-label mt-2">Approved</div>
-            </div>
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Approved</p>
+            <span class="stat-icon tone-green" aria-hidden="true"><i class="bi bi-check-circle"></i></span>
         </div>
+        <p class="stat-value">{{ counts.approved }}</p>
+        <p class="stat-hint">Reserved sessions</p>
     </div>
-    <div class="col-6 col-lg">
-        <div class="card stat-card rejected h-100">
-            <div class="card-body">
-                <div class="stat-value">{{ counts.rejected }}</div>
-                <div class="meta-label mt-2">Rejected</div>
-            </div>
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Rejected</p>
+            <span class="stat-icon tone-red" aria-hidden="true"><i class="bi bi-x-circle"></i></span>
         </div>
+        <p class="stat-value">{{ counts.rejected }}</p>
+        <p class="stat-hint">Not approved</p>
     </div>
-    <div class="col-6 col-lg">
-        <div class="card stat-card cancelled h-100">
-            <div class="card-body">
-                <div class="stat-value">{{ counts.cancelled }}</div>
-                <div class="meta-label mt-2">Cancelled</div>
-            </div>
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Cancelled</p>
+            <span class="stat-icon tone-gray" aria-hidden="true"><i class="bi bi-slash-circle"></i></span>
         </div>
+        <p class="stat-value">{{ counts.cancelled }}</p>
+        <p class="stat-hint">Withdrawn</p>
     </div>
 </div>
 

@@ -1,26 +1,28 @@
 {% extends "base.html" %}
-{% load crispy_forms_tags %}
+{% load static crispy_forms_tags %}
 {% block title %}Sign in · CS/CIS Session Registration{% endblock %}
 {% block content %}
 <div class="auth-card">
-    <div class="text-center mb-4">
-        <div class="brand-mark mx-auto mb-3" style="height:3rem;width:5rem;font-size:1.2rem;">CS/CIS</div>
-        <h1 class="h3 mb-1">Session Registration</h1>
-        <p class="text-muted mb-0">Sign in with your CS/CIS Beni-Suef Chapter account.</p>
+    <div class="auth-header">
+        <img src="{% static 'images/logo.png' %}" alt="CS/CIS Beni-Suef Chapter logo" class="auth-logo">
+        <h1 class="auth-title">Sign in</h1>
+        <p class="auth-subtitle">Sign in with your CS/CIS Beni-Suef Chapter account.</p>
     </div>
     <div class="card">
-        <div class="card-body p-4">
+        <div class="card-body">
             <form method="post">
                 {% csrf_token %}
                 {{ form|crispy }}
-                <button type="submit" class="btn btn-brand w-100 mt-3">Sign in</button>
+                <button type="submit" class="btn btn-brand w-100 mt-3">
+                    <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Sign in
+                </button>
             </form>
-            <div class="text-center mt-3">
+            <div class="auth-links">
                 <a class="small" href="{% url 'password_reset' %}">Forgot your password?</a>
             </div>
         </div>
     </div>
-    <p class="text-center text-muted small mt-3 mb-0">
+    <p class="auth-footer">
         Accounts are created and managed by an administrator.
     </p>
 </div>

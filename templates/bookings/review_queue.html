@@ -1,17 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Review queue · CS/CIS Session Registration{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-    <div>
-        <h1 class="h3 mb-1">Review queue</h1>
-        <p class="text-muted mb-0">All pending requests across every unit. Approving a request reserves the place globally.</p>
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <h1 class="page-title">Review queue</h1>
+            <p class="page-subtitle">All pending requests across every unit. Approving a request reserves the place globally.</p>
+        </div>
     </div>
-    <a class="btn btn-outline-secondary" href="{% url 'request_list' %}?status=pending">Open filtered list</a>
+    <div class="page-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'request_list' %}?status=pending">
+            <i class="bi bi-list-ul" aria-hidden="true"></i> Open filtered list
+        </a>
+    </div>
 </div>
 
-<div class="card">
+<div class="card overflow-hidden">
     <div class="table-responsive">
-        <table class="table mb-0">
+        <table class="table">
             <thead>
             <tr>
                 <th>Title</th>
@@ -27,20 +34,28 @@
             {% for item in pending %}
                 <tr>
                     <td>
-                        <a class="fw-semibold" href="{% url 'request_detail' item.pk %}">{{ item.title }}</a>
-                        <div class="small text-muted">{{ item.purpose|truncatechars:80 }}</div>
+                        <a href="{% url 'request_detail' item.pk %}">{{ item.title }}</a>
+                        <div class="table-subtext">{{ item.purpose|truncatechars:80 }}</div>
                     </td>
                     <td>{{ item.requesting_unit }}</td>
                     <td>{{ item.place }}</td>
-                    <td>{{ item.start_at|date:"M j, Y" }}</td>
-                    <td>{{ item.start_at|date:"H:i" }}–{{ item.end_at|date:"H:i" }}</td>
+                    <td class="text-nowrap">{{ item.start_at|date:"M j, Y" }}</td>
+                    <td class="text-nowrap">{{ item.start_at|date:"H:i" }}–{{ item.end_at|date:"H:i" }}</td>
                     <td>{{ item.submitted_by }}</td>
                     <td class="text-end">
                         <a class="btn btn-sm btn-brand" href="{% url 'request_review' item.pk %}">Review</a>
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="7" class="text-muted text-center py-5">The queue is clear.</td></tr>
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state empty-state--plain">
+                            <span class="empty-icon" aria-hidden="true"><i class="bi bi-check2-circle"></i></span>
+                            <h2>The queue is clear</h2>
+                            <p>There are no pending requests waiting for review.</p>
+                        </div>
+                    </td>
+                </tr>
             {% endfor %}
             </tbody>
         </table>

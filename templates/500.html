@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Server error · CS/CIS Session Registration{% endblock %}
 {% block content %}
-<div class="text-center py-5">
-    <div class="display-4 fw-bold" style="color: var(--brand-danger);">500</div>
-    <h1 class="h4 mt-2">Something went wrong</h1>
-    <p class="text-muted">The request could not be completed. Try again in a moment.</p>
+<div class="error-state">
+    <span class="error-icon" aria-hidden="true"><i class="bi bi-exclamation-triangle"></i></span>
+    <div class="error-code">500</div>
+    <h1>Something went wrong</h1>
+    <p>The request could not be completed. Try again in a moment.</p>
     <a class="btn btn-brand" href="{% url 'dashboard' %}">Back to dashboard</a>
 </div>
 {% endblock %}

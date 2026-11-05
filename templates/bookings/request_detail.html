@@ -2,18 +2,25 @@
 {% load crispy_forms_tags %}
 {% block title %}{{ session_request.title }} · CS/CIS Session Registration{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-    <div>
-        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-            <h1 class="h3 mb-0">{{ session_request.title }}</h1>
-            {% include "bookings/partials/status_badge.html" with status=session_request.status label=session_request.get_status_display %}
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <h1 class="page-title">{{ session_request.title }}</h1>
+                {% include "bookings/partials/status_badge.html" with status=session_request.status label=session_request.get_status_display %}
+            </div>
+            <p class="page-subtitle">Request {{ session_request.pk }}</p>
         </div>
-        <p class="text-muted mb-0">Request {{ session_request.pk }}</p>
     </div>
-    <div class="d-flex flex-wrap gap-2">
-        <a class="btn btn-outline-secondary" href="{% url 'request_list' %}">Back to requests</a>
+    <div class="page-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'request_list' %}">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to requests
+        </a>
         {% if can_review and session_request.status == "pending" %}
-            <a class="btn btn-brand" href="{% url 'request_review' session_request.pk %}">Review request</a>
+            <a class="btn btn-brand" href="{% url 'request_review' session_request.pk %}">
+                <i class="bi bi-check2-square" aria-hidden="true"></i> Review request
+            </a>
         {% endif %}
     </div>
 </div>
@@ -48,7 +55,7 @@
                         <div class="meta-label">Time</div>
                         <div class="meta-value">
                             {{ session_request.start_at|date:"H:i" }}–{{ session_request.end_at|date:"H:i" }}
-                            <span class="text-muted">({{ session_request.duration_minutes }} min)</span>
+                            <span class="text-muted fw-normal">({{ session_request.duration_minutes }} min)</span>
                         </div>
                     </div>
                     <div class="col-12">
@@ -135,7 +142,9 @@
                         {% csrf_token %}
                         {{ cancel_form|crispy }}
                         <button class="btn btn-outline-danger w-100" type="submit"
-                                onclick="return confirm('Cancel this session request?');">Cancel request</button>
+                                onclick="return confirm('Cancel this session request?');">
+                            <i class="bi bi-x-circle" aria-hidden="true"></i> Cancel request
+                        </button>
                     </form>
                 </div>
             </div>

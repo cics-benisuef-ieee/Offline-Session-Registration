@@ -2,12 +2,19 @@
 {% load crispy_forms_tags %}
 {% block title %}Review {{ session_request.title }} · CS/CIS Session Registration{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-    <div>
-        <h1 class="h3 mb-1">Review request</h1>
-        <p class="text-muted mb-0">{{ session_request.title }} · {{ session_request.requesting_unit }}</p>
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <h1 class="page-title">Review request</h1>
+            <p class="page-subtitle">{{ session_request.title }} · {{ session_request.requesting_unit }}</p>
+        </div>
     </div>
-    <a class="btn btn-outline-secondary" href="{% url 'review_queue' %}">Back to queue</a>
+    <div class="page-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'review_queue' %}">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to queue
+        </a>
+    </div>
 </div>
 
 <div class="row g-4">
@@ -59,7 +66,10 @@
                 <div class="small mt-2">Approval will be blocked until the conflict is resolved.</div>
             </div>
         {% else %}
-            <div class="alert alert-success">No approved bookings overlap this request.</div>
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
+                No approved bookings overlap this request.
+            </div>
         {% endif %}
     </div>
 
@@ -72,7 +82,9 @@
                     {% csrf_token %}
                     <input type="hidden" name="action" value="approve">
                     <button class="btn btn-success w-100" type="submit"
-                            onclick="return confirm('Approve this request and reserve the place?');">Approve request</button>
+                            onclick="return confirm('Approve this request and reserve the place?');">
+                        <i class="bi bi-check-lg" aria-hidden="true"></i> Approve request
+                    </button>
                 </form>
             </div>
         </div>
@@ -85,7 +97,9 @@
                     <input type="hidden" name="action" value="reject">
                     {{ reject_form|crispy }}
                     <button class="btn btn-outline-danger w-100" type="submit"
-                            onclick="return confirm('Reject this request?');">Reject request</button>
+                            onclick="return confirm('Reject this request?');">
+                        <i class="bi bi-x-lg" aria-hidden="true"></i> Reject request
+                    </button>
                 </form>
             </div>
         </div>

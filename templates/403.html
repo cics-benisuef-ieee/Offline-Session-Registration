@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Access denied · CS/CIS Session Registration{% endblock %}
 {% block content %}
-<div class="text-center py-5">
-    <div class="display-4 fw-bold" style="color: var(--brand-danger);">403</div>
-    <h1 class="h4 mt-2">Access denied</h1>
-    <p class="text-muted">Your account does not have permission to open this page.</p>
+<div class="error-state">
+    <span class="error-icon" aria-hidden="true"><i class="bi bi-shield-lock"></i></span>
+    <div class="error-code">403</div>
+    <h1>Access denied</h1>
+    <p>Your account does not have permission to open this page.</p>
     <a class="btn btn-brand" href="{% url 'dashboard' %}">Back to dashboard</a>
 </div>
 {% endblock %}

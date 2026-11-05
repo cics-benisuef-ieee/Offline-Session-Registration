@@ -1,12 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Calendar · CS/CIS Session Registration{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-    <div>
-        <h1 class="h3 mb-1">Approved sessions</h1>
-        <p class="text-muted mb-0">Only approved requests appear on the calendar. Pending requests do not block a place.</p>
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <h1 class="page-title">Approved sessions</h1>
+            <p class="page-subtitle">Only approved requests appear on the calendar. Pending requests do not block a place.</p>
+        </div>
     </div>
-    <a class="btn btn-brand" href="{% url 'request_create' %}">New request</a>
+    <div class="page-actions">
+        <a class="btn btn-brand" href="{% url 'request_create' %}">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> New request
+        </a>
+    </div>
 </div>
 
 <div class="card">
@@ -22,7 +29,10 @@
                 </select>
             </div>
         </div>
-        <div id="calendar-loading" class="small text-muted mb-2">Loading sessions…</div>
+        <div id="calendar-loading" class="small text-muted mb-2">
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Loading sessions…
+        </div>
         <div id="calendar"></div>
     </div>
 </div>

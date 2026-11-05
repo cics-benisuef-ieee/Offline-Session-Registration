@@ -1,111 +1,143 @@
 {% extends "base.html" %}
 {% block title %}Dashboard · CS/CIS Session Registration{% endblock %}
 {% block content %}
-<div class="hero mb-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
         <div>
-            <p class="text-uppercase small mb-2" style="letter-spacing:.12em;opacity:.8;">CS/CIS Beni-Suef Chapter session booking</p>
-            <h1 class="h3 mb-2">Welcome, {{ user.full_name|default:user.email }}</h1>
-            <p class="lead mb-0">
-                {% if user.unit %}{{ user.unit }}{% else %}Administrator{% endif %}
+            <h1 class="page-title">Today at a glance</h1>
+            <p class="page-subtitle">
+                Welcome, {{ user.full_name|default:user.email }}
+                {% if user.unit %} · {{ user.unit }}{% else %} · Administrator{% endif %}
                 · Requests are visible to all officers and reviewed globally.
             </p>
         </div>
-        <div class="d-flex gap-2">
-            <a class="btn btn-light" href="{% url 'request_create' %}">New request</a>
-            {% if is_reviewer %}
-                <a class="btn btn-outline-light" href="{% url 'review_queue' %}">Review queue</a>
-            {% endif %}
-        </div>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-brand" href="{% url 'request_create' %}">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i> New request
+        </a>
+        {% if is_reviewer %}
+            <a class="btn btn-outline-secondary" href="{% url 'review_queue' %}">
+                <i class="bi bi-inbox" aria-hidden="true"></i> Review queue
+            </a>
+        {% endif %}
     </div>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-6 col-lg-3">
-        <div class="card stat-card pending h-100">
-            <div class="card-body">
-                <div class="stat-value">{{ counts.pending }}</div>
-                <div class="meta-label mt-2">Pending</div>
-            </div>
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Pending</p>
+            <span class="stat-icon tone-gold" aria-hidden="true"><i class="bi bi-hourglass-split"></i></span>
         </div>
+        <p class="stat-value">{{ counts.pending }}</p>
+        <p class="stat-hint">Awaiting an officer decision</p>
     </div>
-    <div class="col-6 col-lg-3">
-        <div class="card stat-card approved h-100">
-            <div class="card-body">
-                <div class="stat-value">{{ counts.approved }}</div>
-                <div class="meta-label mt-2">Approved</div>
-            </div>
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Approved</p>
+            <span class="stat-icon tone-green" aria-hidden="true"><i class="bi bi-check-circle"></i></span>
         </div>
+        <p class="stat-value">{{ counts.approved }}</p>
+        <p class="stat-hint">Sessions that block the place</p>
     </div>
-    <div class="col-6 col-lg-3">
-        <div class="card stat-card rejected h-100">
-            <div class="card-body">
-                <div class="stat-value">{{ counts.rejected }}</div>
-                <div class="meta-label mt-2">Rejected</div>
-            </div>
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Rejected</p>
+            <span class="stat-icon tone-red" aria-hidden="true"><i class="bi bi-x-circle"></i></span>
         </div>
+        <p class="stat-value">{{ counts.rejected }}</p>
+        <p class="stat-hint">Requests that did not go ahead</p>
     </div>
-    <div class="col-6 col-lg-3">
-        <div class="card stat-card cancelled h-100">
-            <div class="card-body">
-                <div class="stat-value">{{ counts.cancelled }}</div>
-                <div class="meta-label mt-2">Cancelled</div>
-            </div>
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Cancelled</p>
+            <span class="stat-icon tone-gray" aria-hidden="true"><i class="bi bi-slash-circle"></i></span>
         </div>
+        <p class="stat-value">{{ counts.cancelled }}</p>
+        <p class="stat-hint">Withdrawn by the requester</p>
     </div>
 </div>
 
 <div class="row g-4">
     <div class="col-lg-8">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span>Recent requests</span>
-                <a class="small" href="{% url 'request_list' %}">View all</a>
+        <div class="card h-100 overflow-hidden">
+            <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div class="section-heading">
+                    <h2>Recent requests</h2>
+                    <span class="count-chip">{{ counts.total }}</span>
+                </div>
+                <a class="small fw-semibold text-decoration-none" href="{% url 'request_list' %}">
+                    View all <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                </a>
             </div>
-            <div class="table-responsive">
-                <table class="table mb-0">
-                    <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Unit</th>
-                        <th>Place</th>
-                        <th>Start</th>
-                        <th>Status</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for item in recent %}
+            {% if recent %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
                         <tr>
-                            <td><a href="{% url 'request_detail' item.pk %}">{{ item.title }}</a></td>
-                            <td>{{ item.requesting_unit }}</td>
-                            <td>{{ item.place }}</td>
-                            <td>{{ item.start_at|date:"M j, H:i" }}</td>
-                            <td>{% include "bookings/partials/status_badge.html" with status=item.status label=item.get_status_display %}</td>
+                            <th>Title</th>
+                            <th>Unit</th>
+                            <th>Place</th>
+                            <th>Start</th>
+                            <th>Status</th>
                         </tr>
-                    {% empty %}
-                        <tr><td colspan="5" class="text-muted text-center py-4">No requests yet.</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody>
+                        {% for item in recent %}
+                            <tr>
+                                <td><a href="{% url 'request_detail' item.pk %}">{{ item.title }}</a></td>
+                                <td>{{ item.requesting_unit }}</td>
+                                <td>{{ item.place }}</td>
+                                <td class="text-nowrap">{{ item.start_at|date:"M j, H:i" }}</td>
+                                <td>{% include "bookings/partials/status_badge.html" with status=item.status label=item.get_status_display %}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="p-4">
+                    <div class="empty-state">
+                        <span class="empty-icon" aria-hidden="true"><i class="bi bi-calendar2-plus"></i></span>
+                        <h2>No requests yet</h2>
+                        <p>New session requests will appear here as soon as they are submitted.</p>
+                        <a class="btn btn-brand mt-3" href="{% url 'request_create' %}">Create the first request</a>
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </div>
     <div class="col-lg-4">
         <div class="card h-100">
-            <div class="card-header">Upcoming approved sessions</div>
-            <div class="list-group list-group-flush">
-                {% for item in upcoming %}
-                    <a class="list-group-item list-group-item-action" href="{% url 'request_detail' item.pk %}">
-                        <div class="d-flex justify-content-between gap-2">
-                            <span class="fw-semibold">{{ item.title }}</span>
-                            <span class="small text-muted">{{ item.start_at|date:"M j" }}</span>
-                        </div>
-                        <div class="small text-muted">{{ item.place }} · {{ item.start_at|date:"H:i" }}–{{ item.end_at|date:"H:i" }}</div>
-                    </a>
-                {% empty %}
-                    <div class="list-group-item text-muted py-4 text-center">Nothing scheduled.</div>
-                {% endfor %}
+            <div class="card-header d-flex align-items-center justify-content-between gap-2">
+                <span>Upcoming approved sessions</span>
+                <a class="small fw-semibold text-decoration-none" href="{% url 'calendar' %}">Calendar</a>
             </div>
+            {% if upcoming %}
+                <div class="list-group list-group-flush session-list">
+                    {% for item in upcoming %}
+                        <a class="list-group-item list-group-item-action" href="{% url 'request_detail' item.pk %}">
+                            <div class="d-flex justify-content-between gap-2">
+                                <span class="session-title">{{ item.title }}</span>
+                                <span class="session-meta text-nowrap">{{ item.start_at|date:"M j" }}</span>
+                            </div>
+                            <div class="session-meta mt-1">
+                                {{ item.place }} · {{ item.start_at|date:"H:i" }}–{{ item.end_at|date:"H:i" }}
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="p-4">
+                    <div class="empty-state">
+                        <span class="empty-icon" aria-hidden="true"><i class="bi bi-calendar2-week"></i></span>
+                        <h2>Nothing scheduled</h2>
+                        <p>Approved sessions will show up here.</p>
+                    </div>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
