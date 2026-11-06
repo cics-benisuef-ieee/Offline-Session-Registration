@@ -92,7 +92,7 @@ def _derive_units(user, requesting_unit=None):
 
     if unit.kind == Unit.Kind.BOARD:
         if not unit.parent_id:
-            raise ValidationError("This board is not assigned to a chapter.")
+            raise ValidationError("This board is not assigned to a branch or chapter.")
         reviewer_unit = unit.parent
     else:
         reviewer_unit = unit

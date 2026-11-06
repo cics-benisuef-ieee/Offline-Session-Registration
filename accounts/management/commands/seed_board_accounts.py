@@ -9,9 +9,19 @@ from units.models import Unit
 
 EMAIL_DOMAIN = "cics.benisuef.ieee"
 
+EMAIL_OVERRIDES = {
+    "Human Resources": "hr@benisuef.ieee",
+    "Entrepreneurship": "entrepreneurship@benisuef.ieee",
+    "Visuals": "visuals@benisuef.ieee",
+    "Presentation": "presentation@benisuef.ieee",
+    "Digital Marketing": "digital-marketing@benisuef.ieee",
+}
+
 
 def board_email(board_name):
     """Build the board account email from the board name."""
+    if board_name in EMAIL_OVERRIDES:
+        return EMAIL_OVERRIDES[board_name]
     local_part = re.sub(r"[^a-z0-9]+", "-", board_name.lower()).strip("-")
     return f"{local_part}@{EMAIL_DOMAIN}"
 

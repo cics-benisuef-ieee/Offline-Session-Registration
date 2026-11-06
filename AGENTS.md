@@ -40,7 +40,8 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 - `accounts`: custom `User` (`email` login, `full_name`, `unit`, `account_type`).
   Account types are `OFFICER` and `BOARD_ACCOUNT`; admin is `is_superuser`/`is_staff`.
 - `units`: `Unit` with kinds `branch`, `chapter`, `board`; the seed creates
-  `CS/CIS Beni-Suef Chapter` and parents the 11 boards to it.
+  `CS/CIS Beni-Suef Chapter` with 11 boards and `Beni-Suef Student Branch`
+  with five branch boards.
 - `places`: predefined rooms plus closure date ranges.
 - `bookings`: `SessionRequest` (UUID), `RequestStatusHistory`, service layer, forms, views.
 - `notifications`: email helpers; sends are deferred with `transaction.on_commit()`.
@@ -49,13 +50,13 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 
 ## Invariants
 
-- One board account per board is enforced by a partial unique constraint on
-  `User.unit` when `account_type == "BOARD_ACCOUNT"`.
+- One board account per board or branch committee is enforced by a partial unique
+  constraint on `User.unit` when `account_type == "BOARD_ACCOUNT"`.
 - Pending requests do not block slots. Only approved requests block slots.
 - Approval checks conflicts globally across all units. Do not scope the conflict check to the
   requesting unit or reviewer unit.
 - `reviewer_unit` is a reporting snapshot (board parent or entity unit), not a visibility filter.
-- Board accounts see only their own board's requests and cannot approve/reject.
+- Board accounts see only their own unit's requests and cannot approve/reject.
 - Chapter officers and admins see all requests and can approve/reject any request, including
   their own.
 - Rejected and cancelled requests are terminal.

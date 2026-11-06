@@ -15,6 +15,7 @@ from bookings.services import (
     visible_requests_for,
 )
 from places.models import PlaceClosure
+from units.models import Unit
 
 pytestmark = pytest.mark.django_db
 
@@ -44,6 +45,34 @@ def test_board_request_is_pending_and_visible_only_to_own_board(
     assert list(visible_requests_for(board_user)) == [request]
     assert list(visible_requests_for(other_board_user)) == []
     assert list(visible_requests_for(officer)) == [request]
+
+
+def test_branch_board_request_uses_branch_as_reviewer_unit(
+    db, place, start_at, end_at
+):
+    branch = Unit.objects.create(
+        name="Beni-Suef Student Branch",
+        slug="branch",
+        kind=Unit.Kind.BRANCH,
+    )
+    board = Unit.objects.create(
+        name="Human Resources",
+        slug="human-resources",
+        kind=Unit.Kind.BOARD,
+        parent=branch,
+    )
+    user = User.objects.create_user(
+        email="hr@benisuef.ieee",
+        password="test-password",
+        full_name="Human Resources Board Account",
+        unit=board,
+        account_type=User.AccountType.BOARD_ACCOUNT,
+    )
+
+    request = make_request(user, place, start_at, end_at)
+
+    assert request.reviewer_unit == branch
+    assert list(visible_requests_for(user)) == [request]
 
 
 def test_board_account_cannot_request_for_another_unit(

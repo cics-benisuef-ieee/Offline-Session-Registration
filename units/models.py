@@ -32,9 +32,13 @@ class Unit(models.Model):
         super().clean()
         if self.kind == self.Kind.BOARD:
             if not self.parent_id:
-                raise ValidationError({"parent": "A board must belong to a chapter."})
-            if self.parent.kind != self.Kind.CHAPTER:
-                raise ValidationError({"parent": "A board's parent must be a chapter."})
+                raise ValidationError(
+                    {"parent": "A board must belong to a branch or chapter."}
+                )
+            if self.parent.kind not in {self.Kind.BRANCH, self.Kind.CHAPTER}:
+                raise ValidationError(
+                    {"parent": "A board's parent must be a branch or chapter."}
+                )
         if self.parent_id and self.parent_id == self.pk:
             raise ValidationError({"parent": "A unit cannot be its own parent."})
 

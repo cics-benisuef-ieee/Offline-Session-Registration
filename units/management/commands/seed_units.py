@@ -17,12 +17,36 @@ BOARDS = [
     "UI/UX",
 ]
 
+BRANCH_BOARDS = [
+    "Human Resources",
+    "Entrepreneurship",
+    "Visuals",
+    "Presentation",
+    "Digital Marketing",
+]
+
+
+def _slug(name):
+    return name.lower().replace(" ", "-").replace("/", "-")
+
 
 class Command(BaseCommand):
-    help = "Create or update the CS/CIS Beni-Suef Chapter and its boards."
+    help = (
+        "Create or update the CS/CIS chapter, its boards, the Beni-Suef Student "
+        "Branch, and the branch committees."
+    )
 
     @transaction.atomic
     def handle(self, *args, **options):
+        branch, _ = Unit.objects.update_or_create(
+            slug="branch",
+            defaults={
+                "name": "Beni-Suef Student Branch",
+                "kind": Unit.Kind.BRANCH,
+                "parent": None,
+                "is_active": True,
+            },
+        )
         chapter, _ = Unit.objects.update_or_create(
             slug="cs-cis",
             defaults={
@@ -32,13 +56,10 @@ class Command(BaseCommand):
                 "is_active": True,
             },
         )
-        # Deactivate units left behind by the previous branch-level seed.
-        Unit.objects.filter(slug__in=["branch", "wie"]).update(is_active=False)
 
         for board_name in BOARDS:
-            slug = board_name.lower().replace(" ", "-").replace("/", "-")
             Unit.objects.update_or_create(
-                slug=slug,
+                slug=_slug(board_name),
                 defaults={
                     "name": board_name,
                     "kind": Unit.Kind.BOARD,
@@ -47,8 +68,21 @@ class Command(BaseCommand):
                 },
             )
 
+        for board_name in BRANCH_BOARDS:
+            Unit.objects.update_or_create(
+                slug=_slug(board_name),
+                defaults={
+                    "name": board_name,
+                    "kind": Unit.Kind.BOARD,
+                    "parent": branch,
+                    "is_active": True,
+                },
+            )
+
         self.stdout.write(
             self.style.SUCCESS(
-                f"Seeded CS/CIS Beni-Suef Chapter and {len(BOARDS)} boards."
+                "Seeded CS/CIS Beni-Suef Chapter, Beni-Suef Student Branch, "
+                f"{len(BOARDS)} chapter boards, and "
+                f"{len(BRANCH_BOARDS)} branch boards."
             )
         )

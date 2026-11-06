@@ -9,10 +9,11 @@ registration, QR tickets, check-in, or payments.
 
 ## What it does
 
-- The seeded entity is the **CS/CIS Beni-Suef Chapter**, with the 11 chapter boards parented to
-  it. The `Unit` model still supports branch, chapter, and board kinds for future use.
-- Each board has exactly one board account. Board accounts can submit requests for their own
-  board and see only their own board's requests.
+- The seeded entities are the **CS/CIS Beni-Suef Chapter** with its 11 boards, and the
+  **Beni-Suef Student Branch** with five branch boards/committees. Boards can be parented to
+  either a chapter or a branch.
+- Each board or branch committee has exactly one board account. Board accounts can submit
+  requests for their own unit and see only their own unit's requests.
 - Chapter officers can submit requests for the chapter, see every request, and approve or reject
   any request, including their own.
 - Admins can manage units, accounts, places, and closures through Django admin. Chapter officers
@@ -55,13 +56,14 @@ The seed command is idempotent:
 uv run python manage.py seed_units
 ```
 
-It creates `CS/CIS Beni-Suef Chapter` and the 11 boards:
+It creates `CS/CIS Beni-Suef Chapter` and its 11 boards:
 
 Agentic AI, Machine Learning, Data Analysis, Red-Team, Network, Mechanical Design, Embedded
 Systems, Front-end, Back-end, Flutter, UI/UX.
 
-On an existing database, legacy branch and affinity-group units from the earlier seed are
-deactivated.
+It also creates `Beni-Suef Student Branch` and its five branch boards:
+
+Human Resources, Entrepreneurship, Visuals, Presentation, Digital Marketing.
 
 Create or refresh the board accounts with:
 
@@ -69,9 +71,12 @@ Create or refresh the board accounts with:
 uv run python manage.py seed_board_accounts --password "<strong-password>"
 ```
 
-The command creates one account per active board. Emails are generated from the board name by
-lowercasing it and replacing spaces or slashes with hyphens, for example
-`ui-ux@cics.benisuef.ieee`. Re-running the command updates the existing accounts.
+The command creates one account per active board. Chapter board emails are generated from the
+board name by lowercasing it and replacing spaces or slashes with hyphens, for example
+`ui-ux@cics.benisuef.ieee`. Branch boards use the branch email addresses:
+`hr@benisuef.ieee`, `entrepreneurship@benisuef.ieee`, `visuals@benisuef.ieee`,
+`presentation@benisuef.ieee`, and `digital-marketing@benisuef.ieee`. Re-running the command
+updates the existing accounts.
 
 ## Tests and linting
 
@@ -85,7 +90,7 @@ uv run ruff check .
 
 | Account | Can submit for | Sees | Can approve/reject |
 | --- | --- | --- | --- |
-| Board account | Its own board | Its own board's requests | No |
+| Board account | Its own board or branch committee | Its own unit's requests | No |
 | Chapter officer | The chapter | All requests | Yes, including own |
 | Admin (`is_superuser`) | The chapter or any board | All requests | Yes |
 
@@ -256,8 +261,8 @@ DATABASE_URL="$SUPABASE_SESSION_URL" uv run python manage.py seed_board_accounts
 DATABASE_URL="$SUPABASE_SESSION_URL" uv run python manage.py createsuperuser
 ```
 
-This creates the tables, the CS/CIS chapter and 11 boards, the board accounts, and the first admin
-account.
+This creates the tables, the CS/CIS chapter and its 11 boards, the Beni-Suef Student Branch and
+its five branch boards, the 16 board accounts, and the first admin account.
 
 The migration that creates the exclusion constraint runs:
 

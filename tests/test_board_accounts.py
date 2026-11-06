@@ -13,10 +13,10 @@ def test_seed_board_accounts_creates_one_per_board():
     call_command("seed_board_accounts", password="test-password")
 
     boards = Unit.objects.filter(kind=Unit.Kind.BOARD, is_active=True)
-    assert boards.count() == 11
+    assert boards.count() == 16
     assert User.objects.filter(
         account_type=User.AccountType.BOARD_ACCOUNT
-    ).count() == 11
+    ).count() == 16
 
     for board in boards:
         user = User.objects.get(email=board_email(board.name))
@@ -26,6 +26,11 @@ def test_seed_board_accounts_creates_one_per_board():
         assert user.check_password("test-password") is True
 
     assert board_email("UI/UX") == "ui-ux@cics.benisuef.ieee"
+    assert board_email("Human Resources") == "hr@benisuef.ieee"
+    assert (
+        board_email("Digital Marketing")
+        == "digital-marketing@benisuef.ieee"
+    )
 
 
 def test_seed_board_accounts_is_idempotent():
@@ -35,7 +40,10 @@ def test_seed_board_accounts_is_idempotent():
 
     assert User.objects.filter(
         account_type=User.AccountType.BOARD_ACCOUNT
-    ).count() == 11
+    ).count() == 16
     assert User.objects.get(
         email="agentic-ai@cics.benisuef.ieee"
+    ).check_password("second-password") is True
+    assert User.objects.get(
+        email="hr@benisuef.ieee"
     ).check_password("second-password") is True
