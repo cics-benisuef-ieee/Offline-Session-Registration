@@ -104,12 +104,29 @@ if not DEBUG and _database_engine == "django.db.backends.sqlite3":
         "DJANGO_DEBUG=False."
     )
 
-if _database_engine == "django.db.backends.postgresql" and (
-    not DEBUG or os.environ.get("VERCEL")
-):
-    DATABASES["default"].setdefault("OPTIONS", {}).setdefault(
-        "sslmode", env("DB_SSLMODE", default="require")
+if _database_engine == "django.db.backends.postgresql":
+    _database_options = DATABASES["default"].setdefault("OPTIONS", {})
+
+    if not DEBUG or os.environ.get("VERCEL"):
+        _database_options.setdefault("sslmode", env("DB_SSLMODE", default="require"))
+
+    # Fail quickly instead of letting a Vercel request hang on a bad database connection.
+    _database_options.setdefault(
+        "connect_timeout", env.int("DB_CONNECT_TIMEOUT", default=10)
     )
+
+    # Vercel functions should not keep connections open between invocations.
+    DATABASES["default"].setdefault("CONN_MAX_AGE", 0)
+    DATABASES["default"].setdefault("CONN_HEALTH_CHECKS", True)
+
+    # Supabase's transaction pooler (port 6543) does not support named prepared
+    # statements or server-side cursors. Disable both when using that pooler.
+    if (
+        os.environ.get("VERCEL")
+        or str(DATABASES["default"].get("PORT")) == "6543"
+    ):
+        _database_options.setdefault("prepare_threshold", None)
+        DATABASES["default"].setdefault("DISABLE_SERVER_SIDE_CURSORS", True)
 
 AUTH_PASSWORD_VALIDATORS = [
     {

@@ -158,9 +158,13 @@ build command or `build_files.sh`.
 ### Response speed
 
 - Put the Vercel function in the **same region as the Supabase project**. Cross-region database
-  round trips are the largest source of page latency.
+  round trips are the largest source of page latency and make slow mobile connections more likely
+  to abort a request. This project sets `"regions": ["arn1"]` in `vercel.json` because the current
+  Supabase project is in `eu-north-1` (Stockholm). If you move the database, update that value
+  (for example `fra1` for `eu-central-1`).
 - Use the Supabase **transaction pooler** URL for the Vercel `DATABASE_URL`. Do not use the direct
-  `db.<project-ref>.supabase.co` host at runtime.
+  `db.<project-ref>.supabase.co` host at runtime. The settings disable prepared statements and
+  server-side cursors automatically when the connection uses port `6543`.
 - Keep `DJANGO_DEBUG=False` in production. WhiteNoise serves compressed static files, and
   `GZipMiddleware` compresses HTML and JSON responses.
 - Dashboard and report status counts are aggregated in one database query, and the request list is
@@ -200,6 +204,10 @@ build command or `build_files.sh`.
   `DATABASE_URL` manually.
 - If you see SQLite errors on Vercel, `DATABASE_URL` is missing or still points at SQLite.
   Vercel does not support SQLite for production.
+- If the browser shows `ERR_NETWORK_CHANGED` or “The network connection was interrupted” after a
+  form submission, the request may already have committed. This is a browser/network-level abort,
+  not a database rollback. Check the request list before submitting again. Keeping the Vercel
+  function in the database region and using a stable connection reduces the chance of it happening.
 
 ### Supabase setup
 
