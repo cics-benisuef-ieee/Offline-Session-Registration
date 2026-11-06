@@ -9,11 +9,12 @@ registration, QR tickets, check-in, or payments.
 
 ## What it does
 
-- The seeded entities are the **CS/CIS Beni-Suef Chapter** with its 11 boards, and the
-  **Beni-Suef Student Branch** with five branch boards/committees. Boards can be parented to
+- The seeded entities are the **CS/CIS Beni-Suef Chapter** with its 11 boards, the
+  **Beni-Suef Student Branch** with five branch boards/committees, and the
+  **WIE Beni-Suef Affinity Group** with its Event Management board. Boards can be parented to
   either a chapter or a branch.
-- Each board or branch committee has exactly one board account. Board accounts can submit
-  requests for their own unit and see only their own unit's requests.
+- Each board or committee has exactly one board account. Board accounts can submit requests
+  for their own unit and see only their own unit's requests.
 - Chapter officers can submit requests for the chapter, see every request, and approve or reject
   any request, including their own.
 - Admins can manage units, accounts, places, and closures through Django admin. Chapter officers
@@ -65,6 +66,8 @@ It also creates `Beni-Suef Student Branch` and its five branch boards:
 
 Human Resources, Entrepreneurship, Visuals, Presentation, Digital Marketing.
 
+It also creates `WIE Beni-Suef Affinity Group` and its Event Management board.
+
 Create or refresh the board accounts with:
 
 ```bash
@@ -75,8 +78,8 @@ The command creates one account per active board. Chapter board emails are gener
 board name by lowercasing it and replacing spaces or slashes with hyphens, for example
 `ui-ux@cics.benisuef.ieee`. Branch boards use the branch email addresses:
 `hr@benisuef.ieee`, `entrepreneurship@benisuef.ieee`, `visuals@benisuef.ieee`,
-`presentation@benisuef.ieee`, and `digital-marketing@benisuef.ieee`. Re-running the command
-updates the existing accounts.
+`presentation@benisuef.ieee`, and `digital-marketing@benisuef.ieee`. The WIE Event Management
+board uses `em@wie.benisuef.ieee`. Re-running the command updates the existing accounts.
 
 ## Tests and linting
 
@@ -262,7 +265,8 @@ DATABASE_URL="$SUPABASE_SESSION_URL" uv run python manage.py createsuperuser
 ```
 
 This creates the tables, the CS/CIS chapter and its 11 boards, the Beni-Suef Student Branch and
-its five branch boards, the 16 board accounts, and the first admin account.
+its five branch boards, the WIE Event Management board, the 17 board accounts, and the first
+admin account.
 
 The migration that creates the exclusion constraint runs:
 

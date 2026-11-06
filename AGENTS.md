@@ -40,8 +40,8 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 - `accounts`: custom `User` (`email` login, `full_name`, `unit`, `account_type`).
   Account types are `OFFICER` and `BOARD_ACCOUNT`; admin is `is_superuser`/`is_staff`.
 - `units`: `Unit` with kinds `branch`, `chapter`, `board`; the seed creates
-  `CS/CIS Beni-Suef Chapter` with 11 boards and `Beni-Suef Student Branch`
-  with five branch boards.
+  `CS/CIS Beni-Suef Chapter` with 11 boards, `Beni-Suef Student Branch` with
+  five branch boards, and `WIE Beni-Suef Affinity Group` with Event Management.
 - `places`: predefined rooms plus closure date ranges.
 - `bookings`: `SessionRequest` (UUID), `RequestStatusHistory`, service layer, forms, views.
 - `notifications`: email helpers; sends are deferred with `transaction.on_commit()`.

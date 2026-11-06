@@ -25,6 +25,10 @@ BRANCH_BOARDS = [
     "Digital Marketing",
 ]
 
+WIE_BOARDS = [
+    "Event Management",
+]
+
 
 def _slug(name):
     return name.lower().replace(" ", "-").replace("/", "-")
@@ -33,7 +37,7 @@ def _slug(name):
 class Command(BaseCommand):
     help = (
         "Create or update the CS/CIS chapter, its boards, the Beni-Suef Student "
-        "Branch, and the branch committees."
+        "Branch, the branch committees, and the WIE boards."
     )
 
     @transaction.atomic
@@ -53,6 +57,15 @@ class Command(BaseCommand):
                 "name": "CS/CIS Beni-Suef Chapter",
                 "kind": Unit.Kind.CHAPTER,
                 "parent": None,
+                "is_active": True,
+            },
+        )
+        wie, _ = Unit.objects.update_or_create(
+            slug="wie",
+            defaults={
+                "name": "WIE Beni-Suef Affinity Group",
+                "kind": Unit.Kind.CHAPTER,
+                "parent": branch,
                 "is_active": True,
             },
         )
@@ -79,10 +92,23 @@ class Command(BaseCommand):
                 },
             )
 
+        for board_name in WIE_BOARDS:
+            Unit.objects.update_or_create(
+                slug=_slug(board_name),
+                defaults={
+                    "name": board_name,
+                    "kind": Unit.Kind.BOARD,
+                    "parent": wie,
+                    "is_active": True,
+                },
+            )
+
         self.stdout.write(
             self.style.SUCCESS(
                 "Seeded CS/CIS Beni-Suef Chapter, Beni-Suef Student Branch, "
-                f"{len(BOARDS)} chapter boards, and "
-                f"{len(BRANCH_BOARDS)} branch boards."
+                "WIE Beni-Suef Affinity Group, "
+                f"{len(BOARDS)} chapter boards, "
+                f"{len(BRANCH_BOARDS)} branch boards, and "
+                f"{len(WIE_BOARDS)} WIE board."
             )
         )

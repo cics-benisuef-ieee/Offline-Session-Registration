@@ -15,6 +15,7 @@ EMAIL_OVERRIDES = {
     "Visuals": "visuals@benisuef.ieee",
     "Presentation": "presentation@benisuef.ieee",
     "Digital Marketing": "digital-marketing@benisuef.ieee",
+    "Event Management": "em@wie.benisuef.ieee",
 }
 
 

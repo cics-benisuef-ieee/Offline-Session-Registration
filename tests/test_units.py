@@ -25,9 +25,15 @@ def test_seed_units_creates_chapter_branch_and_boards():
     assert branch.parent is None
     assert branch.is_active is True
 
+    wie = Unit.objects.get(slug="wie")
+    assert wie.name == "WIE Beni-Suef Affinity Group"
+    assert wie.kind == Unit.Kind.CHAPTER
+    assert wie.parent == branch
+    assert wie.is_active is True
+
     assert Unit.objects.filter(kind=Unit.Kind.BOARD, parent=chapter).count() == 11
     assert Unit.objects.filter(kind=Unit.Kind.BOARD, parent=branch).count() == 5
-    assert Unit.objects.get(slug="wie").is_active is True
+    assert Unit.objects.filter(kind=Unit.Kind.BOARD, parent=wie).count() == 1
 
 
 def test_board_can_belong_to_a_branch():
