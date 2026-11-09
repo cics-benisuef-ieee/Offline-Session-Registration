@@ -1,6 +1,9 @@
 import json
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
+from django.conf import settings
 from django.urls import reverse
 
 from accounts.models import User
@@ -366,3 +369,115 @@ def test_board_user_can_cancel_approved_request(
     assert response.status_code == 302
     session_request.refresh_from_db()
     assert session_request.status == SessionRequest.Status.CANCELLED
+
+
+def test_clone_prefills_the_request_form(client, board_user, place, start_at, end_at):
+    session_request = make_request(board_user, place, start_at, end_at)
+    client.force_login(board_user)
+
+    response = client.get(
+        reverse("request_create"), {"from": session_request.pk}
+    )
+
+    assert response.status_code == 200
+    initial = response.context["form"].initial
+    assert initial["place"] == place.pk
+    assert initial["title"] == session_request.title
+    assert initial["purpose"] == session_request.purpose
+    assert initial["duration_minutes"] == 60
+    assert "date" not in initial
+    assert "start_time" not in initial
+
+
+def test_board_user_cannot_clone_another_boards_request(
+    client, board_user, other_board_user, place, start_at, end_at
+):
+    other_request = make_request(other_board_user, place, start_at, end_at)
+    client.force_login(board_user)
+
+    response = client.get(reverse("request_create"), {"from": other_request.pk})
+
+    assert response.status_code == 404
+
+
+def test_clone_with_a_malformed_id_returns_404(client, board_user):
+    client.force_login(board_user)
+
+    response = client.get(reverse("request_create"), {"from": "not-a-uuid"})
+
+    assert response.status_code == 404
+
+
+def test_board_account_cannot_bulk_review(
+    client, board_user, other_board_user, place, start_at, end_at
+):
+    session_request = make_request(other_board_user, place, start_at, end_at)
+    client.force_login(board_user)
+
+    response = client.post(
+        reverse("request_bulk_review"),
+        {"request_ids": [session_request.pk], "action": "approve"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_officer_bulk_review_reports_partial_success(
+    client, officer, board_user, other_board_user, place, start_at, end_at
+):
+    already_approved = make_request(board_user, place, start_at, end_at, title="Approved")
+    approve_session_request(request_id=already_approved.pk, reviewer=officer)
+    pending = make_request(
+        other_board_user,
+        place,
+        start_at + timedelta(hours=2),
+        end_at + timedelta(hours=2),
+        title="Pending",
+    )
+    client.force_login(officer)
+
+    response = client.post(
+        reverse("request_bulk_review"),
+        {
+            "request_ids": [already_approved.pk, pending.pk],
+            "action": "approve",
+        },
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    pending.refresh_from_db()
+    assert pending.status == SessionRequest.Status.APPROVED
+    content = response.content.decode()
+    assert "1 request(s) approved." in content
+    assert "1 request(s) could not be updated." in content
+
+
+def test_availability_next_returns_a_free_slot(client, board_user, place, tomorrow):
+    after = datetime.combine(
+        tomorrow, time(10, 0), tzinfo=ZoneInfo(settings.TIME_ZONE)
+    )
+    client.force_login(board_user)
+
+    response = client.get(
+        reverse("availability_next"),
+        {"place": place.pk, "duration": 60, "after": after.isoformat()},
+    )
+
+    assert response.status_code == 200
+    payload = json.loads(response.content)
+    assert payload["slot"]["date"] == tomorrow.isoformat()
+    assert payload["slot"]["start"][11:16] == "10:00"
+    assert payload["slot"]["end"][11:16] == "11:00"
+
+
+def test_availability_next_rejects_an_invalid_duration(client, board_user, place):
+    client.force_login(board_user)
+
+    response = client.get(
+        reverse("availability_next"),
+        {"place": place.pk, "duration": 45},
+    )
+
+    assert response.status_code == 400
+    assert "Duration" in response.json()["error"]

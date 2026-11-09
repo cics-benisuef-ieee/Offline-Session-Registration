@@ -1,6 +1,8 @@
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
+from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 
@@ -8,8 +10,11 @@ from accounts.models import User
 from bookings.models import RequestStatusHistory, SessionRequest
 from bookings.services import (
     approve_session_request,
+    bulk_decide,
     cancel_session_request,
+    clone_initial,
     create_session_request,
+    find_next_available_slot,
     get_available_slots,
     reject_session_request,
     visible_requests_for,
@@ -320,3 +325,211 @@ def test_admin_can_create_for_a_board(admin_user, board, cs_cis, place, start_at
 
     assert request.requesting_unit == board
     assert request.reviewer_unit == cs_cis
+
+
+def at(day, hour, minute=0):
+    return datetime.combine(day, time(hour, minute), tzinfo=ZoneInfo(settings.TIME_ZONE))
+
+
+def test_clone_initial_prefills_visible_request(board_user, place, start_at, end_at):
+    session_request = make_request(board_user, place, start_at, end_at)
+
+    initial = clone_initial(board_user, session_request)
+
+    assert initial == {
+        "place": place.pk,
+        "title": session_request.title,
+        "purpose": session_request.purpose,
+        "duration_minutes": 60,
+    }
+
+
+def test_clone_initial_includes_unit_for_superuser(
+    admin_user, board, board_user, place, start_at, end_at
+):
+    session_request = make_request(board_user, place, start_at, end_at)
+
+    initial = clone_initial(admin_user, session_request)
+
+    assert initial["requesting_unit"] == board.pk
+
+
+def test_clone_initial_rejects_another_boards_request(
+    board_user, other_board_user, place, start_at, end_at
+):
+    session_request = make_request(other_board_user, place, start_at, end_at)
+
+    with pytest.raises(PermissionDenied):
+        clone_initial(board_user, session_request)
+
+
+def test_find_next_available_slot_returns_contiguous_window(place, tomorrow):
+    slot = find_next_available_slot(
+        place=place,
+        duration_minutes=90,
+        after=at(tomorrow, 10),
+    )
+
+    assert slot["date"] == tomorrow.isoformat()
+    assert slot["start"][11:16] == "10:00"
+    assert slot["end"][11:16] == "11:30"
+
+
+def test_find_next_available_slot_skips_approved_booking(
+    officer, board_user, place, tomorrow
+):
+    session_request = make_request(
+        board_user, place, at(tomorrow, 10), at(tomorrow, 11)
+    )
+    approve_session_request(request_id=session_request.pk, reviewer=officer)
+
+    slot = find_next_available_slot(
+        place=place,
+        duration_minutes=60,
+        after=at(tomorrow, 10),
+    )
+
+    assert slot["date"] == tomorrow.isoformat()
+    assert slot["start"][11:16] == "11:00"
+
+
+def test_find_next_available_slot_skips_closure(place, tomorrow):
+    PlaceClosure.objects.create(
+        place=place,
+        start_date=tomorrow,
+        end_date=tomorrow,
+        reason="Maintenance",
+    )
+
+    slot = find_next_available_slot(
+        place=place,
+        duration_minutes=60,
+        after=at(tomorrow, 9),
+        horizon_days=2,
+    )
+
+    assert slot["date"] == (tomorrow + timedelta(days=1)).isoformat()
+    assert slot["start"][11:16] == "09:00"
+
+
+def test_find_next_available_slot_aligns_to_the_next_slot(place, tomorrow):
+    slot = find_next_available_slot(
+        place=place,
+        duration_minutes=60,
+        after=at(tomorrow, 10, 15),
+    )
+
+    assert slot["start"][11:16] == "10:30"
+
+
+def test_find_next_available_slot_respects_closing_time(place, tomorrow):
+    slot = find_next_available_slot(
+        place=place,
+        duration_minutes=60,
+        after=at(tomorrow, 17, 30),
+    )
+
+    assert slot["date"] == (tomorrow + timedelta(days=1)).isoformat()
+    assert slot["start"][11:16] == "09:00"
+
+
+def test_find_next_available_slot_returns_none_at_the_horizon(place, tomorrow):
+    PlaceClosure.objects.create(
+        place=place,
+        start_date=tomorrow,
+        end_date=tomorrow,
+        reason="Maintenance",
+    )
+
+    slot = find_next_available_slot(
+        place=place,
+        duration_minutes=60,
+        after=at(tomorrow, 9),
+        horizon_days=1,
+    )
+
+    assert slot is None
+
+
+def test_find_next_available_slot_rejects_invalid_duration(place, tomorrow):
+    with pytest.raises(ValidationError):
+        find_next_available_slot(
+            place=place,
+            duration_minutes=45,
+            after=at(tomorrow, 9),
+        )
+
+
+def test_bulk_decide_requires_an_officer(board_user, place, start_at, end_at):
+    session_request = make_request(board_user, place, start_at, end_at)
+
+    with pytest.raises(PermissionDenied):
+        bulk_decide(
+            request_ids=[session_request.pk],
+            action="approve",
+            reviewer=board_user,
+        )
+
+
+def test_bulk_decide_reports_partial_success(
+    officer, board_user, other_board_user, place, tomorrow
+):
+    already_approved = make_request(
+        board_user, place, at(tomorrow, 10), at(tomorrow, 11), title="Approved"
+    )
+    approve_session_request(request_id=already_approved.pk, reviewer=officer)
+    pending = make_request(
+        other_board_user, place, at(tomorrow, 12), at(tomorrow, 13), title="Pending"
+    )
+
+    result = bulk_decide(
+        request_ids=[already_approved.pk, pending.pk],
+        action="approve",
+        reviewer=officer,
+    )
+
+    assert result["succeeded"] == [str(pending.pk)]
+    assert len(result["failed"]) == 1
+    assert result["failed"][0]["id"] == str(already_approved.pk)
+    pending.refresh_from_db()
+    assert pending.status == SessionRequest.Status.APPROVED
+
+
+def test_bulk_decide_reject_requires_a_reason(
+    officer, board_user, place, start_at, end_at
+):
+    session_request = make_request(board_user, place, start_at, end_at)
+
+    with pytest.raises(ValidationError):
+        bulk_decide(
+            request_ids=[session_request.pk],
+            action="reject",
+            reviewer=officer,
+            reason="",
+        )
+
+
+def test_bulk_decide_rejects_selected_requests(
+    officer, board_user, other_board_user, place, tomorrow
+):
+    first = make_request(
+        board_user, place, at(tomorrow, 10), at(tomorrow, 11), title="First"
+    )
+    second = make_request(
+        other_board_user, place, at(tomorrow, 12), at(tomorrow, 13), title="Second"
+    )
+
+    result = bulk_decide(
+        request_ids=[first.pk, second.pk],
+        action="reject",
+        reviewer=officer,
+        reason="Not this term.",
+    )
+
+    assert set(result["succeeded"]) == {str(first.pk), str(second.pk)}
+    assert result["failed"] == []
+    assert SessionRequest.objects.filter(
+        pk__in=[first.pk, second.pk],
+        status=SessionRequest.Status.REJECTED,
+        decision_reason="Not this term.",
+    ).count() == 2

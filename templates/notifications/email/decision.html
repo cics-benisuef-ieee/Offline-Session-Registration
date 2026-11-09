@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<body style="margin:0;padding:24px;background:#f4f6f9;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-top:4px solid #00629B;padding:24px;">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#00629B;">
+      CS/CIS Beni-Suef Chapter
+    </p>
+    <h1 style="margin:0 0 16px;font-size:20px;">
+      Session request {{ session_request.status }}
+    </h1>
+    <p style="margin:0 0 12px;">
+      Your request for <strong>{{ session_request.place }}</strong> on
+      {{ start|date:"D, d M Y H:i" }}–{{ end|date:"H:i" }}
+      was <strong>{{ session_request.status }}</strong>.
+    </p>
+    {% if session_request.decision_reason %}
+      <p style="margin:0 0 12px;"><strong>Reason:</strong> {{ session_request.decision_reason }}</p>
+    {% endif %}
+    {% if google_calendar_url %}
+      <p style="margin:0 0 12px;">
+        <a href="{{ google_calendar_url }}" style="color:#00629B;">Add to Google Calendar</a>
+      </p>
+    {% endif %}
+    <p style="margin:0;color:#6b7280;font-size:13px;">Request ID: {{ request_id }}</p>
+  </div>
+</body>
+</html>

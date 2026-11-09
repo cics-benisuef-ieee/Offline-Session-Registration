@@ -1,0 +1,8 @@
+Approved session deleted by admin: {{ session_request.title }}
+
+An admin deleted the approved session for {{ session_request.place }} on
+{{ start|date:"D, d M Y H:i" }}–{{ end|date:"H:i" }}.
+
+Reason: {{ deletion_reason }}
+
+Request ID: {{ request_id }}

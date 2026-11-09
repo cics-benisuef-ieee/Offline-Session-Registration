@@ -16,49 +16,90 @@
     </div>
 </div>
 
-<div class="card overflow-hidden">
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-            <tr>
-                <th>Title</th>
-                <th>Unit</th>
-                <th>Place</th>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Submitted by</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for item in pending %}
-                <tr>
-                    <td>
-                        <a href="{% url 'request_detail' item.pk %}">{{ item.title }}</a>
-                        <div class="table-subtext">{{ item.purpose|truncatechars:80 }}</div>
-                    </td>
-                    <td>{{ item.requesting_unit }}</td>
-                    <td>{{ item.place }}</td>
-                    <td class="text-nowrap">{{ item.start_at|date:"M j, Y" }}</td>
-                    <td class="text-nowrap">{{ item.start_at|date:"H:i" }}–{{ item.end_at|date:"H:i" }}</td>
-                    <td>{{ item.submitted_by }}</td>
-                    <td class="text-end">
-                        <a class="btn btn-sm btn-brand" href="{% url 'request_review' item.pk %}">Review</a>
-                    </td>
-                </tr>
-            {% empty %}
-                <tr>
-                    <td colspan="7">
-                        <div class="empty-state empty-state--plain">
-                            <span class="empty-icon" aria-hidden="true"><i class="bi bi-check2-circle"></i></span>
-                            <h2>The queue is clear</h2>
-                            <p>There are no pending requests waiting for review.</p>
-                        </div>
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+<form method="post" action="{% url 'request_bulk_review' %}" x-data="{ all: false }">
+    {% csrf_token %}
+    <div class="card filter-card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label" for="bulk_reason">Rejection reason</label>
+                    <input class="form-control" id="bulk_reason" name="reason"
+                           placeholder="Required when rejecting selected requests">
+                </div>
+                <div class="col-md-7 d-flex flex-wrap gap-2">
+                    <button class="btn btn-success" type="submit" name="action" value="approve">
+                        <i class="bi bi-check-lg" aria-hidden="true"></i> Approve selected
+                    </button>
+                    <button class="btn btn-outline-danger" type="submit" name="action" value="reject">
+                        <i class="bi bi-x-lg" aria-hidden="true"></i> Reject selected
+                    </button>
+                    <span class="small text-muted align-self-center">Select requests below, then choose an action.</span>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+
+    <div class="card overflow-hidden">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                <tr>
+                    <th style="width:2.5rem;">
+                        <input class="form-check-input" type="checkbox" x-model="all"
+                               @change="document.querySelectorAll('.bulk-check').forEach(c => c.checked = all)"
+                               aria-label="Select all pending requests">
+                    </th>
+                    <th>Title</th>
+                    <th>Unit</th>
+                    <th>Place</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Submitted by</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in pending %}
+                    <tr>
+                        <td>
+                            <input class="form-check-input bulk-check" type="checkbox"
+                                   name="request_ids" value="{{ item.pk }}"
+                                   aria-label="Select {{ item.title }}">
+                        </td>
+                        <td>
+                            <a href="{% url 'request_detail' item.pk %}">{{ item.title }}</a>
+                            {% if item.series %}
+                                <a class="badge text-bg-primary text-decoration-none"
+                                   href="{% url 'series_detail' item.series.pk %}">
+                                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                                    {{ item.series.get_frequency_display }}
+                                </a>
+                            {% endif %}
+                            <div class="table-subtext">{{ item.purpose|truncatechars:80 }}</div>
+                        </td>
+                        <td>{{ item.requesting_unit }}</td>
+                        <td>{{ item.place }}</td>
+                        <td class="text-nowrap">{{ item.start_at|date:"M j, Y" }}</td>
+                        <td class="text-nowrap">{{ item.start_at|date:"H:i" }}–{{ item.end_at|date:"H:i" }}</td>
+                        <td>{{ item.submitted_by }}</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-brand" href="{% url 'request_review' item.pk %}">Review</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state empty-state--plain">
+                                <span class="empty-icon" aria-hidden="true"><i class="bi bi-check2-circle"></i></span>
+                                <h2>The queue is clear</h2>
+                                <p>There are no pending requests waiting for review.</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
 {% endblock %}

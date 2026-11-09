@@ -1,0 +1,6 @@
+Session request cancelled: {{ session_request.title }}
+
+{{ session_request.requesting_unit }} cancelled the request for
+{{ session_request.place }} on {{ start|date:"D, d M Y H:i" }}–{{ end|date:"H:i" }}.
+
+Request ID: {{ request_id }}

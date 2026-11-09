@@ -21,11 +21,28 @@
             </div>
         {% endif %}
 
+        <div class="alert alert-light border d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span>
+                <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>
+                Need this session to repeat? Preview the occurrences and deselect any conflicts.
+            </span>
+            <a class="btn btn-sm btn-outline-brand" href="{% url 'series_create' %}">
+                Book a recurring series
+            </a>
+        </div>
+
         <div class="card">
             <div class="card-body p-4">
                 <form method="post" novalidate>
                     {% csrf_token %}
                     {{ form|crispy }}
+                    <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                        <button type="button" class="btn btn-outline-brand" id="find-next-slot"
+                                data-url="{% url 'availability_next' %}">
+                            <i class="bi bi-calendar-check" aria-hidden="true"></i> Find next free time
+                        </button>
+                        <span class="small text-muted" id="find-next-status" aria-live="polite"></span>
+                    </div>
                     <div id="availability" class="mt-2" aria-live="polite"></div>
                     <div id="availability-indicator" class="htmx-indicator text-muted small mt-2">
                         <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -45,4 +62,47 @@
         </div>
     </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+    const button = document.getElementById("find-next-slot");
+    if (!button) {
+        return;
+    }
+    const place = document.getElementById("id_place");
+    const duration = document.getElementById("id_duration_minutes");
+    const date = document.getElementById("id_date");
+    const startTime = document.getElementById("id_start_time");
+    const status = document.getElementById("find-next-status");
+
+    button.addEventListener("click", async function () {
+        if (!place.value || !duration.value) {
+            status.textContent = "Choose a place and duration first.";
+            return;
+        }
+        status.textContent = "Searching…";
+        const url = new URL(button.dataset.url, window.location.origin);
+        url.searchParams.set("place", place.value);
+        url.searchParams.set("duration", duration.value);
+        try {
+            const response = await fetch(url, {
+                headers: {"X-Requested-With": "XMLHttpRequest"},
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.slot) {
+                status.textContent = payload.error || "No free window found in the next 60 days.";
+                return;
+            }
+            date.value = payload.slot.date;
+            startTime.value = payload.slot.start.slice(11, 16);
+            status.textContent =
+                "Next free: " + payload.slot.date + " " + payload.slot.start.slice(11, 16) + ".";
+            date.dispatchEvent(new Event("change", {bubbles: true}));
+        } catch (error) {
+            status.textContent = "Could not check availability. Try again.";
+        }
+    });
+})();
+</script>
 {% endblock %}

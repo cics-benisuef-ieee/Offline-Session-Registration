@@ -1,0 +1,10 @@
+Session request {{ session_request.status }}: {{ session_request.title }}
+
+Your request for {{ session_request.place }} on
+{{ start|date:"D, d M Y H:i" }}–{{ end|date:"H:i" }} was {{ session_request.status }}.
+{% if session_request.decision_reason %}
+Reason: {{ session_request.decision_reason }}
+{% endif %}{% if google_calendar_url %}
+Add to Google Calendar: {{ google_calendar_url }}
+{% endif %}
+Request ID: {{ request_id }}

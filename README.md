@@ -18,8 +18,20 @@ registration, QR tickets, check-in, or payments.
 - Chapter officers can submit requests for the chapter, see every request, and approve or reject
   any request, including their own.
 - Admins can manage units, accounts, places, and closures through Django admin. Chapter officers
-  and admins can filter the request register at `/reports/` and download a CSV; board accounts
-  cannot export reports.
+  and admins can filter the request register at `/reports/`, download CSV or XLSX, inspect the
+  status-change audit log at `/reports/audit/`, and view the utilization heatmap at
+  `/reports/utilization/`; board accounts cannot reach reports, analytics, audit, or exports.
+- Superusers can soft-delete erroneous or test requests with a reason, restore them from the admin,
+  and permanently purge old deleted rows with `manage.py purge_deleted_sessions`. Hard deletion is
+  disabled everywhere else.
+- Users receive in-app notifications and optional emails for new requests, decisions, cancellations,
+  deletions, and session reminders. Each user controls email channels and the officer digest
+  frequency from `/settings/notifications/`.
+- Approved sessions get 24-hour and 2-hour email reminders. Chapter officers and admins can also
+  receive a daily or weekly digest of the pending queue and upcoming sessions.
+- Requesters can book a recurring series (weekly, biweekly, or monthly). The preview flags
+  conflicts and unavailable dates; only the selected occurrences are submitted, and officers can
+  approve or reject the whole series or individual occurrences.
 - Users can request a password reset from the sign-in page; reset links are sent through the
   configured email backend.
 - Pending requests do **not** block a place. Only approved requests block a place.
@@ -122,6 +134,44 @@ The approval path locks the request and place row, checks for an approved overla
 writes the status change. On PostgreSQL, a `btree_gist` exclusion constraint provides a second
 line of defence against overlapping approved rows.
 
+## Recurring series
+
+Use **Book a recurring series** from the request form (or open `/requests/series/new/`). A series
+stores the place, title, purpose, frequency, weekday, start time, duration, and date range. The
+preview generates one candidate occurrence per date and marks each as available, conflicting with
+an approved booking, or unavailable (past, closed, or outside opening hours). Conflicting and
+unavailable rows cannot be selected.
+
+Each selected occurrence becomes an ordinary pending `SessionRequest` linked to the series, so the
+normal conflict check, review queue, calendar, reports, and exclusion constraint keep working.
+Officers can approve or reject all pending occurrences, cancel one occurrence or the selected
+occurrence and all later ones, and reschedule future pending occurrences. Cancelling or rescheduling
+never changes past occurrences.
+
+The generation rules are:
+
+- **Weekly** steps seven days from the first matching weekday.
+- **Every two weeks** steps fourteen days.
+- **Monthly** repeats on the original day of the month, clamped to the month's last day
+  (for example, January 31 → February 28 → March 31).
+
+## Reports, analytics, and exports
+
+Officers and admins can reach the reporting suite from `/reports/`:
+
+- **Reports** (`/reports/`) — filtered counts, status split, per-unit and per-place breakdowns, and
+  monthly charts.
+- **Utilization** (`/reports/utilization/`) — a place × weekday × hour heatmap of approved booked
+  minutes. The denominator is the place's opening hours across the selected range, minus closure
+  days, so percentages stay honest and never exceed 100%. A table fallback is available for each
+  grid.
+- **Audit log** (`/reports/audit/`) — paginated `RequestStatusHistory` events filtered by actor, new
+  status, date range, and request ID or title.
+- **Exports** — `/reports/requests.csv` and `/reports/requests.xlsx` reuse the same register filters
+  as the reports page.
+
+Board accounts receive `403` for every reporting, analytics, audit, and export endpoint.
+
 ## Email
 
 Local development defaults to Django's console email backend. To use SMTP, set these variables
@@ -139,6 +189,60 @@ DEFAULT_FROM_EMAIL=sessions@example.com
 
 The email calls use `transaction.on_commit()` and fail silently, so an email provider outage does
 not roll back a booking.
+
+## Notifications, reminders, and digest
+
+In-app notifications are always written to the notification center at `/notifications/`. Email
+delivery is controlled per user at `/settings/notifications/`:
+
+- new request (officers and admins)
+- decision (requester)
+- cancellation (officers and admins)
+- deletion of an approved session (requester, officers, and admins)
+- session reminders (requester)
+- officer digest (officers and admins)
+
+Approved sessions receive a 24-hour and a 2-hour reminder. Each reminder is stamped on the request
+and de-duplicated by a notification unique constraint, so repeated scheduler runs are harmless.
+The officer digest includes the pending queue and approved sessions in the next 14 days; it can be
+set to off, daily, or weekly (weekly sends on Monday).
+
+Run the jobs manually with:
+
+```bash
+uv run python manage.py send_session_reminders
+uv run python manage.py send_officer_digest
+```
+
+Both are also exposed as scheduler endpoints protected by `CRON_SECRET`:
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/cron/reminders/` | `POST` | Send any 24h/2h reminder that is now due |
+| `/cron/digest/` | `GET` or `POST` | Send the officer digest |
+
+The request must include `Authorization: Bearer <CRON_SECRET>`. Both endpoints return JSON counts
+and respond with `401` when the secret is missing or wrong. The handlers reconcile instead of
+assuming exact timing, so a late or duplicated run does not duplicate a reminder.
+
+### Scheduler setup
+
+The Vercel plan is Hobby, which allows at most one cron run per day. The project splits the triggers:
+
+- **Vercel Cron** runs `/cron/digest/` daily at `0 7 * * *` (see `vercel.json`).
+- **GitHub Actions** runs `.github/workflows/reminders.yml` every 15 minutes and calls
+  `/cron/reminders/`, covering the 2-hour reminder and any missed 24-hour send.
+
+Add these repository secrets in GitHub (**Settings → Secrets and variables → Actions**):
+
+| Secret | Value |
+| --- | --- |
+| `CRON_SECRET` | The same value configured in Vercel |
+| `APP_URL` | The production URL, for example `https://your-app.vercel.app` |
+
+Keep `CRON_SECRET` in sync when rotating it: update Vercel, redeploy, update the GitHub secret, then
+confirm the next invocation returns `2xx`. Vercel automatically sends the header on its own cron
+invocations; the GitHub workflow sends it explicitly.
 
 ## Deployment on Vercel
 
@@ -189,6 +293,7 @@ build command or `build_files.sh`.
 | `DATABASE_URL` | PostgreSQL connection string |
 | `DEFAULT_FROM_EMAIL` | Sender for notifications |
 | `EMAIL_BACKEND` | SMTP backend in production |
+| `CRON_SECRET` | Bearer secret shared with the Vercel and GitHub schedulers |
 | `DJANGO_SECURE_COOKIES` | `True` on HTTPS |
 | `DJANGO_SECURE_SSL_REDIRECT` | `True` on HTTPS |
 | `DJANGO_SECURE_HSTS_SECONDS` | `31536000` after the domain is confirmed |
@@ -302,6 +407,7 @@ EMAIL_PORT=587
 EMAIL_HOST_USER=...
 EMAIL_HOST_PASSWORD=...
 EMAIL_USE_TLS=True
+CRON_SECRET=<long-random-secret>
 DJANGO_SECURE_COOKIES=True
 DJANGO_SECURE_SSL_REDIRECT=True
 DJANGO_SECURE_HSTS_SECONDS=31536000
@@ -341,8 +447,8 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 accounts/        Custom user model, account types, admin
 units/           Unit model and chapter/board seed command
 places/          Rooms and closure dates
-bookings/        Requests, status history, services, forms, views
-notifications/   Transactional email helpers
+bookings/        Requests, recurring series, status history, services, forms, views
+notifications/   In-app notifications, preferences, reminders, digest, email templates
 config/          Django settings, URLs, ASGI/WSGI entrypoints
 templates/       Shared and booking templates
 static/css/      CS/CIS chapter theme

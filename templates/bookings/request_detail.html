@@ -10,13 +10,29 @@
                 <h1 class="page-title">{{ session_request.title }}</h1>
                 {% include "bookings/partials/status_badge.html" with status=session_request.status label=session_request.get_status_display %}
             </div>
-            <p class="page-subtitle">Request {{ session_request.pk }}</p>
+            <p class="page-subtitle">
+                Request {{ session_request.pk }}
+                {% if session_request.series %}
+                    · <a href="{% url 'series_detail' session_request.series.pk %}">Part of a recurring series</a>
+                {% endif %}
+            </p>
         </div>
     </div>
     <div class="page-actions">
         <a class="btn btn-outline-secondary" href="{% url 'request_list' %}">
             <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to requests
         </a>
+        <a class="btn btn-outline-brand" href="{% url 'request_create' %}?from={{ session_request.pk }}">
+            <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Book again
+        </a>
+        {% if google_calendar_url %}
+            <a class="btn btn-outline-brand" href="{{ google_calendar_url }}" target="_blank" rel="noopener">
+                <i class="bi bi-google" aria-hidden="true"></i> Add to Google Calendar
+            </a>
+            <a class="btn btn-outline-secondary" href="{% url 'request_ics' session_request.pk %}">
+                <i class="bi bi-calendar-event" aria-hidden="true"></i> Download .ics
+            </a>
+        {% endif %}
         {% if can_review and session_request.status == "pending" %}
             <a class="btn btn-brand" href="{% url 'request_review' session_request.pk %}">
                 <i class="bi bi-check2-square" aria-hidden="true"></i> Review request
@@ -47,6 +63,17 @@
                         <div class="meta-label">Submitted by</div>
                         <div class="meta-value">{{ session_request.submitted_by }}</div>
                     </div>
+                    {% if session_request.series %}
+                        <div class="col-sm-6">
+                            <div class="meta-label">Recurring series</div>
+                            <div class="meta-value">
+                                <a href="{% url 'series_detail' session_request.series.pk %}">
+                                    {{ session_request.series.get_frequency_display }}
+                                    (occurrence {{ session_request.series_index|add:1 }})
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
                     <div class="col-sm-6">
                         <div class="meta-label">Date</div>
                         <div class="meta-value">{{ session_request.start_at|date:"l, F j, Y" }}</div>
@@ -144,6 +171,27 @@
                         <button class="btn btn-outline-danger w-100" type="submit"
                                 onclick="return confirm('Cancel this session request?');">
                             <i class="bi bi-x-circle" aria-hidden="true"></i> Cancel request
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if user.is_superuser %}
+            <div class="card mt-4 border-danger">
+                <div class="card-header text-danger">Admin: soft delete</div>
+                <div class="card-body">
+                    <p class="small text-muted">
+                        Deletes this request from the normal UI and releases its slot. The record stays
+                        available in the admin for restore and audit.
+                    </p>
+                    <form method="post" action="{% url 'request_delete' session_request.pk %}"
+                          onsubmit="return confirm('Soft delete this session request?');">
+                        {% csrf_token %}
+                        <label class="form-label" for="deletion_reason">Deletion reason</label>
+                        <textarea class="form-control" id="deletion_reason" name="reason" rows="3" required></textarea>
+                        <button class="btn btn-outline-danger w-100 mt-2" type="submit">
+                            <i class="bi bi-trash" aria-hidden="true"></i> Soft delete request
                         </button>
                     </form>
                 </div>

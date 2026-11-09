@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<body style="margin:0;padding:24px;background:#f4f6f9;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-top:4px solid #00629B;padding:24px;">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#00629B;">
+      CS/CIS Beni-Suef Chapter
+    </p>
+    <h1 style="margin:0 0 16px;font-size:20px;">New recurring series</h1>
+    <p style="margin:0 0 12px;">
+      <strong>{{ series.requesting_unit }}</strong> requested
+      <strong>{{ count }}</strong> {{ series.get_frequency_display|lower }} session(s) at
+      <strong>{{ series.place }}</strong>.
+    </p>
+    {% if first %}
+      <p style="margin:0 0 4px;"><strong>First:</strong> {{ first.start_at|date:"D, d M Y H:i" }}</p>
+      <p style="margin:0 0 12px;"><strong>Last:</strong> {{ last.start_at|date:"D, d M Y H:i" }}</p>
+    {% endif %}
+    <p style="margin:0;color:#6b7280;font-size:13px;">Review the occurrences in the session booking app.</p>
+  </div>
+</body>
+</html>

@@ -5,5 +5,11 @@
     "config/wsgi.py": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/cron/digest/",
+      "schedule": "0 7 * * *"
+    }
+  ]
 }

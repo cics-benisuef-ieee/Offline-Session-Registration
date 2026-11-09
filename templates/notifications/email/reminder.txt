@@ -1,0 +1,6 @@
+Reminder: {{ session_request.title }} starts in {{ hours }} hours
+
+Your session at {{ session_request.place }} starts on
+{{ start|date:"D, d M Y H:i" }} and ends at {{ end|date:"H:i" }}.
+
+Request ID: {{ request_id }}

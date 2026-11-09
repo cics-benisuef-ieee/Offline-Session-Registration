@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Audit log · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <h1 class="page-title">Audit log</h1>
+            <p class="page-subtitle">Every status change recorded for session requests.</p>
+        </div>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'reports' %}">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to reports
+        </a>
+    </div>
+</div>
+
+<div class="card filter-card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" for="q">Request ID or title</label>
+                <input class="form-control" id="q" name="q" value="{{ query }}" placeholder="Title or request UUID">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="actor">Actor</label>
+                <select class="form-select" id="actor" name="actor">
+                    <option value="">All actors</option>
+                    {% for actor in actors %}
+                        <option value="{{ actor.pk }}" {% if selected_actor == actor.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ actor.full_name|default:actor.email }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="status">New status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All statuses</option>
+                    {% for value, label in statuses %}
+                        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="date_from">From</label>
+                <input class="form-control" type="date" id="date_from" name="date_from" value="{{ date_from }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="date_to">To</label>
+                <input class="form-control" type="date" id="date_to" name="date_to" value="{{ date_to }}">
+            </div>
+            <div class="col-md-1 d-flex gap-2">
+                <button class="btn btn-brand w-100" type="submit">Filter</button>
+            </div>
+            <div class="col-12">
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'reports_audit' %}">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>Status changes</span>
+        <span class="text-muted small">{{ page_obj.paginator.count }} event{{ page_obj.paginator.count|pluralize }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+            <tr>
+                <th scope="col">When</th>
+                <th scope="col">Request</th>
+                <th scope="col">Change</th>
+                <th scope="col">Actor</th>
+                <th scope="col">Reason</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for event in history %}
+                <tr>
+                    <td class="text-nowrap">{{ event.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        {% if event.request.deleted_at %}
+                            <span class="text-muted">{{ event.request.title }}</span>
+                            <span class="badge text-bg-secondary">Deleted</span>
+                        {% else %}
+                            <a href="{% url 'request_detail' event.request_id %}">{{ event.request.title }}</a>
+                        {% endif %}
+                        <div class="table-subtext">{{ event.request.requesting_unit }} · {{ event.request.place }}</div>
+                    </td>
+                    <td class="text-nowrap">
+                        <span class="text-muted">{{ event.from_status|default:"new" }}</span>
+                        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                        {% include "bookings/partials/status_badge.html" with status=event.to_status label=event.to_status|capfirst %}
+                    </td>
+                    <td>{{ event.changed_by.full_name|default:event.changed_by.email|default:"System" }}</td>
+                    <td>{{ event.reason|default:"—" }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5" class="text-muted p-4">No status changes match these filters.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-4" aria-label="Audit pagination">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                <a class="page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={% if page_obj.has_previous %}{{ page_obj.previous_page_number }}{% else %}1{% endif %}">Previous</a>
+            </li>
+            <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+            <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                <a class="page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={% if page_obj.has_next %}{{ page_obj.next_page_number }}{% else %}{{ page_obj.paginator.num_pages }}{% endif %}">Next</a>
+            </li>
+        </ul>
+    </nav>
+{% endif %}
+{% endblock %}

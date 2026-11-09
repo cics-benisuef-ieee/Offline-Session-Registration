@@ -1,0 +1,30 @@
+name: Session reminders
+
+on:
+  schedule:
+    # Every 15 minutes. The Hobby Vercel plan cannot run cron more often than
+    # once per day, so the 2-hour reminder is triggered from GitHub Actions.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: session-reminders
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reminder cron
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ] || [ -z "$APP_URL" ]; then
+            echo "Set the CRON_SECRET and APP_URL repository secrets first." >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/cron/reminders/"

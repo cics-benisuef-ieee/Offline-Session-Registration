@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Notifications · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <h1 class="page-title">Notifications</h1>
+            <p class="page-subtitle">
+                {{ unread_count }} unread notification{{ unread_count|pluralize }}.
+            </p>
+        </div>
+    </div>
+    <div class="page-actions">
+        {% if unread_count %}
+            <form method="post" action="{% url 'notification_read_all' %}">
+                {% csrf_token %}
+                <button class="btn btn-outline-brand" type="submit">
+                    <i class="bi bi-check2-all" aria-hidden="true"></i> Mark all read
+                </button>
+            </form>
+        {% endif %}
+        <a class="btn btn-outline-secondary" href="{% url 'notification_preferences' %}">
+            <i class="bi bi-sliders" aria-hidden="true"></i> Preferences
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% for notification in notifications %}
+            {% include "notifications/partials/notification_row.html" %}
+        {% empty %}
+            <p class="text-muted p-4 mb-0">You have no notifications yet.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

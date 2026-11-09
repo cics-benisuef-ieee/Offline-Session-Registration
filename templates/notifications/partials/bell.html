@@ -1,0 +1,5 @@
+<a class="notification-bell" href="{% url 'notification_list' %}"
+   aria-label="Notifications{% if unread_count %} ({{ unread_count }} unread){% endif %}">
+    <i class="bi bi-bell" aria-hidden="true"></i>
+    {% if unread_count %}<span class="notification-badge">{{ unread_count }}</span>{% endif %}
+</a>

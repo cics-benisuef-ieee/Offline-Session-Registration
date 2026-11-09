@@ -43,8 +43,12 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
   `CS/CIS Beni-Suef Chapter` with 11 boards, `Beni-Suef Student Branch` with
   five branch boards, and `WIE Beni-Suef Affinity Group` with Event Management.
 - `places`: predefined rooms plus closure date ranges.
-- `bookings`: `SessionRequest` (UUID), `RequestStatusHistory`, service layer, forms, views.
-- `notifications`: email helpers; sends are deferred with `transaction.on_commit()`.
+- `bookings`: `SessionRequest` (UUID), `BookingSeries`, `RequestStatusHistory`, service layer
+  (`services.py` for requests, `series.py` for recurring series), reporting/analytics
+  (`reports.py`), forms, views.
+- `notifications`: in-app notifications, per-user preferences, reminder and digest
+  scheduling, and email templates; sends are deferred with `transaction.on_commit()`.
+- `templates/notifications/`: notification center, preferences, and email templates.
 - `templates/`: Django templates using Bootstrap 5, HTMX, Alpine.js, FullCalendar.
 - `static/css/theme.css`: CS/CIS chapter palette and shared UI styles.
 
@@ -64,10 +68,31 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 - Start times align to 30-minute slots; durations are 30–240 minutes in 30-minute increments.
 - All state changes must go through `bookings/services.py`; do not mutate
   `SessionRequest.status` directly in views. The Django admin keeps request status fields
-  read-only and disables adding/deleting requests.
-- Reports and CSV export are available to officers and admins only; board accounts receive 403.
+  read-only and disables adding requests. Hard deletion stays disabled; superusers may
+  soft-delete with a reason, restore from the admin, and purge old rows with
+  `manage.py purge_deleted_sessions --older-than <days> --commit`.
+- Reports, utilization analytics, the status-history audit viewer, and CSV/XLSX export are
+  available to officers and admins only; board accounts receive 403.
+- Utilization percentages are computed from approved sessions split into 30-minute slots. The
+  denominator is the place's open minutes for each weekday/hour in the range, minus `PlaceClosure`
+  days, and booked minutes are capped so the percentage never exceeds 100.
+- In-app notifications are always written. Email delivery is gated by `NotificationPreference`;
+  a suppressed email must not suppress the in-app row.
+- Reminder sends are idempotent: `reminder_24h_sent_at` / `reminder_2h_sent_at` on the request and
+  a unique `(user, request, kind)` constraint on reminder notifications guard repeated cron runs.
+- Only approved, non-deleted, future sessions receive reminders. The digest includes pending
+  requests plus approved sessions in the next 14 days; weekly digests send on Monday.
+- Cron endpoints require `Authorization: Bearer <CRON_SECRET>` and return 401 when it is unset or
+  wrong. Do not make the endpoints depend on a specific scheduler.
 - Approval uses a transaction and row locks. PostgreSQL also has an exclusion constraint on
   approved overlapping rows using `btree_gist`; SQLite skips that migration.
+- Recurring series materialize each selected occurrence as an ordinary `SessionRequest` linked to
+  a `BookingSeries` via `series` / `series_index`. Pending occurrences still do not block slots and
+  approval stays per occurrence through `bulk_decide`.
+- Series generation caps at `MAX_SERIES_OCCURRENCES = 52`. Weekly/biweekly step from `weekday`;
+  monthly anchors to the original day of month, clamped to month end (Jan 31 → Feb 28 → Mar 31).
+- Creating a series rejects any selected occurrence that is conflicting, closed, or past. Cancel
+  and reschedule only touch occurrences at or after the anchor and never past occurrences.
 - Times are handled in `Africa/Cairo`; the UI displays local time.
 
 ## Deployment notes
@@ -77,6 +102,11 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 - Vercel runs `collectstatic` automatically because `STATIC_ROOT` is configured.
 - Migrations must run as a separate deploy/CI step with a direct PostgreSQL URL.
 - Supabase runtime should use the pooled Supavisor URL; migrations should use the direct URL.
+- The Vercel plan is Hobby, so `vercel.json` has exactly one daily cron for `/cron/digest/`.
+  Do not add a sub-daily Vercel cron; it fails the deployment. The 2-hour reminder runs from
+  `.github/workflows/reminders.yml` every 15 minutes against `/cron/reminders/`.
+- `CRON_SECRET` must match between Vercel and the GitHub Actions repository secret. Vercel sends
+  the header automatically; the workflow sends it explicitly.
 - Do not add long-running workers or rely on in-memory state across function invocations.
 
 ## Working here

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block title %}New recurring series · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <h1 class="page-title">New recurring series</h1>
+            <p class="page-subtitle">
+                Generate the occurrences, deselect any conflicts, then submit the remaining sessions
+                for review.
+            </p>
+        </div>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'request_list' %}">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to requests
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        {% if not user.is_superuser %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                Requesting for <strong>{{ user.unit|default:"your unit" }}</strong>.
+            </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="post" action="{% url 'series_create' %}" id="series-form" novalidate>
+                    {% csrf_token %}
+                    {{ form|crispy }}
+
+                    <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                        <button type="button" class="btn btn-outline-brand"
+                                hx-post="{% url 'series_preview' %}"
+                                hx-target="#series-preview"
+                                hx-include="#series-form"
+                                hx-indicator="#series-preview-indicator">
+                            <i class="bi bi-calendar3" aria-hidden="true"></i> Preview occurrences
+                        </button>
+                        <span class="small text-muted htmx-indicator" id="series-preview-indicator">
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Checking occurrences…
+                        </span>
+                        <span class="small text-muted">
+                            Conflicts and unavailable dates are disabled automatically.
+                        </span>
+                    </div>
+
+                    <div id="series-preview" class="mt-4" aria-live="polite">
+                        {% if occurrences %}
+                            {% include "bookings/partials/series_preview.html" %}
+                        {% endif %}
+                    </div>
+
+                    <div class="alert alert-light border mt-4 mb-0">
+                        <strong>Note:</strong> pending requests do not reserve the place. Only approved requests
+                        block a slot.
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mt-4">
+                        <button class="btn btn-brand" type="submit" name="action" value="create">
+                            <i class="bi bi-send" aria-hidden="true"></i> Submit series
+                        </button>
+                        <a class="btn btn-outline-secondary" href="{% url 'request_list' %}">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

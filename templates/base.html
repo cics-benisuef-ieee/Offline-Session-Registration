@@ -38,6 +38,14 @@
     </div>
 
     <div class="app-main">
+        <div class="app-topbar">
+            <div class="notification-slot"
+                 hx-get="{% url 'notification_count' %}"
+                 hx-trigger="load, every 60s"
+                 hx-swap="innerHTML">
+                {% include "notifications/partials/bell.html" %}
+            </div>
+        </div>
         <main class="app-content" id="main-content">
 {% else %}
     <div class="public-shell">

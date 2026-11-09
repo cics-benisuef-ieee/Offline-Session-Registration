@@ -1,0 +1,15 @@
+Officer digest ({{ frequency }})
+
+Pending requests: {{ pending|length }}
+{% for item in pending %}
+- {{ item.title }} · {{ item.requesting_unit }} · {{ item.place }} · {{ item.start_at|date:"D, d M Y H:i" }}
+{% empty %}
+- None
+{% endfor %}
+
+Upcoming approved sessions: {{ upcoming|length }}
+{% for item in upcoming %}
+- {{ item.title }} · {{ item.place }} · {{ item.start_at|date:"D, d M Y H:i" }}
+{% empty %}
+- None
+{% endfor %}

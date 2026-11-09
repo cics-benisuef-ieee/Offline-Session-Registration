@@ -1,20 +1,25 @@
-from datetime import datetime, timedelta
+import uuid
+from datetime import UTC, datetime, timedelta
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
+from icalendar import Calendar, Event
 
 from notifications.services import (
     notify_cancellation,
     notify_decision,
+    notify_deletion,
     notify_new_request,
 )
 from places.models import Place, PlaceClosure
 from units.models import Unit
 
-from .models import RequestStatusHistory, SessionRequest
+from .models import CalendarFeed, RequestStatusHistory, SessionRequest
 
 SLOT_MINUTES = 30
 MIN_DURATION_MINUTES = 30
@@ -335,3 +340,340 @@ def get_available_slots(place, on_date):
         cursor = slot_end
 
     return slots
+
+
+def clone_initial(user, source):
+    """Return prefilled form values for a request the user is allowed to see."""
+    if not can_view_request(user, source):
+        raise PermissionDenied("You cannot clone this request.")
+
+    initial = {
+        "place": source.place_id,
+        "title": source.title,
+        "purpose": source.purpose,
+        "duration_minutes": source.duration_minutes,
+    }
+    if user.is_superuser:
+        initial["requesting_unit"] = source.requesting_unit_id
+    return initial
+
+
+def find_next_available_slots(
+    *,
+    place,
+    duration_minutes,
+    after=None,
+    horizon_days=60,
+    limit=3,
+):
+    """Return non-overlapping free windows for a place, starting at or after ``after``."""
+    duration_minutes = int(duration_minutes)
+    if duration_minutes < MIN_DURATION_MINUTES or duration_minutes > MAX_DURATION_MINUTES:
+        raise ValidationError(
+            f"Duration must be between {MIN_DURATION_MINUTES} and "
+            f"{MAX_DURATION_MINUTES} minutes."
+        )
+    if duration_minutes % SLOT_MINUTES:
+        raise ValidationError("Duration must be in 30-minute increments.")
+
+    needed_slots = duration_minutes // SLOT_MINUTES
+    now = timezone.now()
+    after = _ensure_aware(after) if after else now
+    after = max(after, now)
+    first_day = timezone.localtime(after).date()
+
+    results = []
+    for offset in range(horizon_days):
+        on_date = first_day + timedelta(days=offset)
+        slots = get_available_slots(place, on_date)
+        index = 0
+        while index + needed_slots <= len(slots):
+            window = slots[index : index + needed_slots]
+            window_start = datetime.fromisoformat(window[0]["start"])
+            if window_start < after:
+                index += 1
+                continue
+            if all(slot["available"] for slot in window):
+                results.append(
+                    {
+                        "date": on_date.isoformat(),
+                        "start": window_start.isoformat(),
+                        "end": datetime.fromisoformat(window[-1]["end"]).isoformat(),
+                    }
+                )
+                if len(results) >= limit:
+                    return results
+                index += needed_slots
+            else:
+                index += 1
+
+    return results
+
+
+def find_next_available_slot(*, place, duration_minutes, after=None, horizon_days=60):
+    """Return the first free window for a place, or ``None`` when none exists."""
+    slots = find_next_available_slots(
+        place=place,
+        duration_minutes=duration_minutes,
+        after=after,
+        horizon_days=horizon_days,
+        limit=1,
+    )
+    return slots[0] if slots else None
+
+
+def bulk_decide(*, request_ids, action, reviewer, reason=""):
+    """Approve or reject several requests, reporting per-row failures."""
+    if not (reviewer.is_superuser or reviewer.is_officer):
+        raise PermissionDenied("Only officers can review requests.")
+    if action not in {"approve", "reject"}:
+        raise ValidationError("Choose approve or reject.")
+    if action == "reject" and not reason.strip():
+        raise ValidationError("A rejection reason is required.")
+
+    succeeded = []
+    failed = []
+    for request_id in request_ids:
+        try:
+            if action == "approve":
+                session_request = approve_session_request(
+                    request_id=request_id,
+                    reviewer=reviewer,
+                )
+            else:
+                session_request = reject_session_request(
+                    request_id=request_id,
+                    reviewer=reviewer,
+                    reason=reason,
+                )
+        except SessionRequest.DoesNotExist:
+            failed.append({"id": str(request_id), "error": "Request not found."})
+        except ValidationError as exc:
+            failed.append({"id": str(request_id), "error": "; ".join(exc.messages)})
+        else:
+            succeeded.append(str(session_request.pk))
+
+    return {"succeeded": succeeded, "failed": failed}
+
+
+def can_reschedule_request(user, session_request):
+    if not user.is_authenticated:
+        return False
+    if session_request.status not in {
+        SessionRequest.Status.PENDING,
+        SessionRequest.Status.APPROVED,
+    }:
+        return False
+    if user.is_superuser or user.is_officer:
+        return True
+    return (
+        session_request.status == SessionRequest.Status.PENDING
+        and session_request.requesting_unit_id == user.unit_id
+    )
+
+
+@transaction.atomic
+def reschedule_session_request(*, request_id, actor, new_start, new_end):
+    session_request = SessionRequest.objects.select_for_update().get(pk=request_id)
+    if not can_reschedule_request(actor, session_request):
+        raise PermissionDenied("You cannot reschedule this request.")
+
+    new_start = _ensure_aware(new_start)
+    new_end = _ensure_aware(new_end)
+    place = Place.objects.select_for_update().get(pk=session_request.place_id)
+    _validate_request_time(place, new_start, new_end)
+
+    conflict = (
+        SessionRequest.objects.filter(
+            place=place,
+            status=SessionRequest.Status.APPROVED,
+            start_at__lt=new_end,
+            end_at__gt=new_start,
+        )
+        .exclude(pk=session_request.pk)
+        .exists()
+    )
+    if conflict:
+        raise ValidationError("This place is already booked for that time.")
+
+    old_start = session_request.start_at
+    session_request.start_at = new_start
+    session_request.end_at = new_end
+    session_request.save(update_fields=["start_at", "end_at", "updated_at"])
+    RequestStatusHistory.objects.create(
+        request=session_request,
+        from_status=session_request.status,
+        to_status=session_request.status,
+        changed_by=actor,
+        reason=(
+            "Rescheduled from "
+            f"{timezone.localtime(old_start):%Y-%m-%d %H:%M} to "
+            f"{timezone.localtime(new_start):%Y-%m-%d %H:%M}"
+        ),
+    )
+    return session_request
+
+
+def google_calendar_url(session_request, *, absolute_url=""):
+    """Build a one-click Google Calendar template link for an approved session."""
+    start = session_request.start_at.astimezone(UTC)
+    end = session_request.end_at.astimezone(UTC)
+    location = ", ".join(
+        part
+        for part in (
+            session_request.place.name,
+            session_request.place.building,
+            session_request.place.room,
+        )
+        if part
+    )
+    details = session_request.purpose
+    if absolute_url:
+        details = f"{details}\n\n{absolute_url}"
+
+    params = {
+        "action": "TEMPLATE",
+        "text": session_request.title,
+        "dates": f"{start:%Y%m%dT%H%M%SZ}/{end:%Y%m%dT%H%M%SZ}",
+        "details": details,
+        "location": location,
+        "ctz": settings.TIME_ZONE,
+    }
+    return "https://calendar.google.com/calendar/render?" + urlencode(params)
+
+
+def _event_location(session_request):
+    return ", ".join(
+        part
+        for part in (
+            session_request.place.name,
+            session_request.place.building,
+            session_request.place.room,
+        )
+        if part
+    )
+
+
+def build_ics_calendar(session_requests, *, request=None):
+    """Serialize approved session requests as an iCalendar document."""
+    calendar = Calendar()
+    calendar.add("prodid", "-//CS/CIS Beni-Suef Chapter//Session Registration//EN")
+    calendar.add("version", "2.0")
+    calendar.add("x-wr-calname", "CS/CIS Session Registration")
+    calendar.add("x-wr-timezone", settings.TIME_ZONE)
+
+    for session_request in session_requests:
+        event = Event()
+        event.add("uid", str(session_request.pk))
+        event.add("dtstamp", timezone.now())
+        event.add("dtstart", session_request.start_at.astimezone(UTC))
+        event.add("dtend", session_request.end_at.astimezone(UTC))
+        event.add("summary", session_request.title)
+        event.add("location", _event_location(session_request))
+        event.add("status", "CONFIRMED")
+        if request is not None:
+            event.add(
+                "url",
+                request.build_absolute_uri(
+                    reverse("request_detail", args=[session_request.pk])
+                ),
+            )
+        calendar.add_component(event)
+
+    return calendar.to_ical()
+
+
+def get_calendar_feed(user):
+    feed, _ = CalendarFeed.objects.get_or_create(user=user)
+    return feed
+
+
+def rotate_calendar_feed(user):
+    feed = get_calendar_feed(user)
+    feed.token = uuid.uuid4()
+    feed.is_active = True
+    feed.save(update_fields=["token", "is_active"])
+    return feed
+
+
+@transaction.atomic
+def delete_session_request(*, request_id, actor, reason):
+    if not actor.is_superuser:
+        raise PermissionDenied("Only admins can delete session requests.")
+    if not reason.strip():
+        raise ValidationError("A deletion reason is required.")
+
+    session_request = SessionRequest.all_objects.select_for_update().get(pk=request_id)
+    if session_request.deleted_at is not None:
+        raise ValidationError("This request is already deleted.")
+
+    was_approved = session_request.status == SessionRequest.Status.APPROVED
+    session_request.deleted_at = timezone.now()
+    session_request.deleted_by = actor
+    session_request.deletion_reason = reason.strip()
+    session_request.save(
+        update_fields=[
+            "deleted_at",
+            "deleted_by",
+            "deletion_reason",
+            "updated_at",
+        ]
+    )
+    RequestStatusHistory.objects.create(
+        request=session_request,
+        from_status=session_request.status,
+        to_status=session_request.status,
+        changed_by=actor,
+        reason=f"Deleted by admin: {reason.strip()}",
+    )
+    if was_approved:
+        notify_deletion(session_request)
+    return session_request
+
+
+@transaction.atomic
+def restore_session_request(*, request_id, actor):
+    if not actor.is_superuser:
+        raise PermissionDenied("Only admins can restore session requests.")
+
+    session_request = SessionRequest.all_objects.select_for_update().get(pk=request_id)
+    if session_request.deleted_at is None:
+        raise ValidationError("This request is not deleted.")
+
+    if session_request.status == SessionRequest.Status.APPROVED:
+        conflict = (
+            SessionRequest.objects.filter(
+                place=session_request.place,
+                status=SessionRequest.Status.APPROVED,
+                start_at__lt=session_request.end_at,
+                end_at__gt=session_request.start_at,
+            )
+            .exclude(pk=session_request.pk)
+            .exists()
+        )
+        if conflict:
+            raise ValidationError(
+                "Cannot restore: this place is now booked for that time."
+            )
+
+    status = session_request.status
+    session_request.deleted_at = None
+    session_request.deleted_by = None
+    session_request.deletion_reason = ""
+    session_request.save(
+        update_fields=[
+            "deleted_at",
+            "deleted_by",
+            "deletion_reason",
+            "updated_at",
+        ]
+    )
+    RequestStatusHistory.objects.create(
+        request=session_request,
+        from_status=status,
+        to_status=status,
+        changed_by=actor,
+        reason="Restored by admin",
+    )
+    return session_request
+

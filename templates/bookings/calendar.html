@@ -5,8 +5,10 @@
     <div class="page-title-wrap">
         <span class="page-title-bar" aria-hidden="true"></span>
         <div>
-            <h1 class="page-title">Approved sessions</h1>
-            <p class="page-subtitle">Only approved requests appear on the calendar. Pending requests do not block a place.</p>
+            <h1 class="page-title">Session calendar</h1>
+            <p class="page-subtitle">
+                Approved sessions block their place.{% if is_reviewer %} Officers can overlay pending requests and drag sessions to a free slot.{% endif %}
+            </p>
         </div>
     </div>
     <div class="page-actions">
@@ -16,9 +18,9 @@
     </div>
 </div>
 
-<div class="card">
+<div class="card mb-4">
     <div class="card-body">
-        <div class="row mb-3">
+        <div class="row g-3 align-items-end mb-3">
             <div class="col-md-4">
                 <label class="form-label" for="placeFilter">Place</label>
                 <select class="form-select" id="placeFilter">
@@ -28,12 +30,48 @@
                     {% endfor %}
                 </select>
             </div>
+            {% if is_reviewer %}
+                <div class="col-md-4">
+                    <div class="form-check mt-md-4 pt-md-2">
+                        <input class="form-check-input" type="checkbox" id="includePending">
+                        <label class="form-check-label" for="includePending">
+                            Show pending requests
+                        </label>
+                    </div>
+                </div>
+            {% endif %}
+            <div class="col-md-4">
+                <div class="small text-muted" id="calendar-status" aria-live="polite"></div>
+            </div>
         </div>
         <div id="calendar-loading" class="small text-muted mb-2">
             <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
             Loading sessions…
         </div>
         <div id="calendar"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Subscribe to your calendar</div>
+    <div class="card-body">
+        <p class="text-muted">
+            Add this private URL to Google Calendar, Outlook, or Apple Calendar. It contains only the
+            sessions your account is allowed to see. Treat the link as a password.
+        </p>
+        <div class="input-group mb-3">
+            <input class="form-control" id="feedUrl" type="text" value="{{ feed_url }}" readonly>
+            <button class="btn btn-outline-secondary" type="button" id="copyFeedUrl">
+                <i class="bi bi-clipboard" aria-hidden="true"></i> Copy
+            </button>
+        </div>
+        <form method="post" action="{% url 'calendar_feed_rotate' %}"
+              onsubmit="return confirm('Rotate the feed link? The old URL will stop working immediately.');">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger" type="submit">
+                <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Rotate feed link
+            </button>
+        </form>
     </div>
 </div>
 {% endblock %}
@@ -45,10 +83,23 @@
         const calendarEl = document.getElementById("calendar");
         const loadingEl = document.getElementById("calendar-loading");
         const placeFilter = document.getElementById("placeFilter");
+        const pendingToggle = document.getElementById("includePending");
+        const statusEl = document.getElementById("calendar-status");
         const eventsUrl = "{% url 'calendar_events' %}";
+        const csrfToken = "{{ csrf_token }}";
+        const copyButton = document.getElementById("copyFeedUrl");
+        const feedUrl = document.getElementById("feedUrl");
+
+        function showStatus(message, tone) {
+            statusEl.textContent = message;
+            statusEl.className = "small " + (tone || "text-muted");
+        }
+
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: "dayGridMonth",
             height: "auto",
+            editable: true,
+            eventDurationEditable: false,
             loading: function (isLoading) {
                 loadingEl.classList.toggle("d-none", !isLoading);
             },
@@ -64,10 +115,56 @@
                 if (placeFilter.value) {
                     url.searchParams.set("place", placeFilter.value);
                 }
+                if (pendingToggle && pendingToggle.checked) {
+                    url.searchParams.set("include_pending", "1");
+                }
                 fetch(url)
                     .then(function (response) { return response.json(); })
                     .then(successCallback)
                     .catch(failureCallback);
+            },
+            eventAllow: function (dropInfo, draggedEvent) {
+                return Boolean(
+                    draggedEvent.extendedProps &&
+                    draggedEvent.extendedProps.can_reschedule
+                );
+            },
+            eventDrop: function (info) {
+                const url = info.event.extendedProps.reschedule_url;
+                if (!url) {
+                    info.revert();
+                    return;
+                }
+                showStatus("Saving new time…");
+                fetch(url, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrfToken,
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    body: JSON.stringify({
+                        start: info.event.start.toISOString(),
+                        end: info.event.end.toISOString()
+                    })
+                })
+                    .then(function (response) {
+                        return response.json().then(function (payload) {
+                            return {ok: response.ok, payload: payload};
+                        });
+                    })
+                    .then(function (result) {
+                        if (!result.ok) {
+                            info.revert();
+                            showStatus(result.payload.error || "Could not reschedule.", "text-danger");
+                            return;
+                        }
+                        showStatus("Session moved.", "text-success");
+                    })
+                    .catch(function () {
+                        info.revert();
+                        showStatus("Could not reschedule. Try again.", "text-danger");
+                    });
             },
             eventClick: function (info) {
                 if (info.event.url) {
@@ -80,6 +177,19 @@
         placeFilter.addEventListener("change", function () {
             calendar.refetchEvents();
         });
+        if (pendingToggle) {
+            pendingToggle.addEventListener("change", function () {
+                calendar.refetchEvents();
+            });
+        }
+        if (copyButton && feedUrl) {
+            copyButton.addEventListener("click", function () {
+                feedUrl.select();
+                navigator.clipboard.writeText(feedUrl.value).then(function () {
+                    showStatus("Feed link copied.", "text-success");
+                });
+            });
+        }
     });
 </script>
 {% endblock %}

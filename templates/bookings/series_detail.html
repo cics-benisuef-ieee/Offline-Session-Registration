@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block title %}{{ series.title }} series · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <h1 class="page-title">{{ series.title }}</h1>
+                <span class="badge text-bg-primary">{{ series.get_frequency_display }}</span>
+            </div>
+            <p class="page-subtitle">Recurring series · {{ series.requesting_unit }} · {{ series.place }}</p>
+        </div>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'request_list' %}">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to requests
+        </a>
+        {% if can_review %}
+            <form method="post" action="{% url 'series_approve' series.pk %}" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-brand" type="submit">
+                    <i class="bi bi-check2-all" aria-hidden="true"></i> Approve all pending
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">Occurrences</div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for occurrence in occurrences %}
+                        <tr>
+                            <td>{{ occurrence.series_index|add:1 }}</td>
+                            <td class="text-nowrap">{{ occurrence.start_at|date:"D, d M Y" }}</td>
+                            <td class="text-nowrap">
+                                {{ occurrence.start_at|date:"H:i" }}–{{ occurrence.end_at|date:"H:i" }}
+                            </td>
+                            <td>
+                                {% include "bookings/partials/status_badge.html" with status=occurrence.status label=occurrence.get_status_display %}
+                            </td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-brand"
+                                   href="{% url 'request_detail' occurrence.pk %}">Open</a>
+                                {% if can_manage and occurrence.status == "pending" or can_manage and occurrence.status == "approved" %}
+                                    <form method="post" action="{% url 'series_cancel' series.pk %}" class="d-inline"
+                                          onsubmit="return confirm('Cancel this occurrence?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="scope" value="this">
+                                        <input type="hidden" name="occurrence" value="{{ occurrence.pk }}">
+                                        <input type="text" name="reason" class="form-control form-control-sm d-inline-block"
+                                               style="width:12rem;" placeholder="Reason if approved"
+                                               {% if occurrence.status == "approved" %}required{% endif %}>
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">Cancel</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-muted p-4">No occurrences remain in this series.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header">Series details</div>
+            <div class="card-body">
+                <div class="meta-label">Frequency</div>
+                <div class="meta-value">{{ series.get_frequency_display }}</div>
+                {% if series.weekday is not None %}
+                    <div class="meta-label mt-2">Weekday</div>
+                    <div class="meta-value">{{ series.weekday_name }}</div>
+                {% endif %}
+                <div class="meta-label mt-2">Start time</div>
+                <div class="meta-value">{{ series.start_time|time:"H:i" }}</div>
+                <div class="meta-label mt-2">Duration</div>
+                <div class="meta-value">{{ series.duration_minutes }} minutes</div>
+                <div class="meta-label mt-2">Range</div>
+                <div class="meta-value">{{ series.start_date|date:"M j, Y" }} – {{ series.until_date|date:"M j, Y" }}</div>
+                <div class="meta-label mt-2">Submitted by</div>
+                <div class="meta-value">{{ series.submitted_by }}</div>
+            </div>
+        </div>
+
+        {% if can_review %}
+            <div class="card mb-4">
+                <div class="card-header">Reject pending occurrences</div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'series_reject' series.pk %}">
+                        {% csrf_token %}
+                        {{ reject_form|crispy }}
+                        <button class="btn btn-outline-danger w-100" type="submit">
+                            <i class="bi bi-x-lg" aria-hidden="true"></i> Reject all pending
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if can_manage %}
+            <div class="card mb-4">
+                <div class="card-header">Cancel this and future</div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'series_cancel' series.pk %}"
+                          onsubmit="return confirm('Cancel this occurrence and all later ones?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="scope" value="future">
+                        <label class="form-label" for="cancel_occurrence">From occurrence</label>
+                        <select class="form-select mb-2" id="cancel_occurrence" name="occurrence" required>
+                            {% for occurrence in occurrences %}
+                                {% if occurrence.status == "pending" or occurrence.status == "approved" %}
+                                    <option value="{{ occurrence.pk }}">
+                                        {{ occurrence.start_at|date:"D, d M Y H:i" }}
+                                    </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <label class="form-label" for="cancel_reason">Reason (required for approved)</label>
+                        <textarea class="form-control mb-2" id="cancel_reason" name="reason" rows="2"></textarea>
+                        <button class="btn btn-outline-danger w-100" type="submit">Cancel future occurrences</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Reschedule future pending</div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'series_reschedule' series.pk %}">
+                        {% csrf_token %}
+                        <label class="form-label" for="reschedule_occurrence">From occurrence</label>
+                        <select class="form-select mb-2" id="reschedule_occurrence" name="occurrence" required>
+                            {% for occurrence in occurrences %}
+                                {% if occurrence.status == "pending" %}
+                                    <option value="{{ occurrence.pk }}">
+                                        {{ occurrence.start_at|date:"D, d M Y H:i" }}
+                                    </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <label class="form-label" for="reschedule_weekday">New weekday (optional)</label>
+                        <select class="form-select mb-2" id="reschedule_weekday" name="weekday">
+                            <option value="">Keep current weekday</option>
+                            <option value="0">Monday</option>
+                            <option value="1">Tuesday</option>
+                            <option value="2">Wednesday</option>
+                            <option value="3">Thursday</option>
+                            <option value="4">Friday</option>
+                            <option value="5">Saturday</option>
+                            <option value="6">Sunday</option>
+                        </select>
+                        <label class="form-label" for="reschedule_time">New start time (optional)</label>
+                        <input class="form-control mb-2" id="reschedule_time" name="start_time" type="time" step="1800">
+                        <button class="btn btn-outline-brand w-100" type="submit">Reschedule future pending</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

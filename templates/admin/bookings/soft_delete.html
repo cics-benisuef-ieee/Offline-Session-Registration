@@ -1,0 +1,21 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>Soft delete selected requests</h1>
+<p>
+    Deleted requests disappear from the normal UI and release their slot. The row is kept for
+    audit purposes and can be restored from the admin list.
+</p>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    {% for obj in queryset %}
+        <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk }}">
+    {% endfor %}
+    <input type="hidden" name="action" value="soft_delete_selected">
+    <input type="hidden" name="apply" value="1">
+    <div class="submit-row">
+        <input type="submit" class="default" value="Delete selected requests">
+        <a href="{% url 'admin:bookings_sessionrequest_changelist' %}" class="button cancel-link">Cancel</a>
+    </div>
+</form>
+{% endblock %}

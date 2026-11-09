@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<body style="margin:0;padding:24px;background:#f4f6f9;font-family:Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;border-top:4px solid #00629B;padding:24px;">
+    <p style="margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#00629B;">
+      CS/CIS Beni-Suef Chapter
+    </p>
+    <h1 style="margin:0 0 16px;font-size:20px;">Officer digest ({{ frequency }})</h1>
+
+    <h2 style="margin:0 0 8px;font-size:16px;">Pending requests ({{ pending|length }})</h2>
+    <ul style="margin:0 0 20px;padding-left:20px;">
+      {% for item in pending %}
+        <li style="margin-bottom:6px;">
+          <strong>{{ item.title }}</strong> · {{ item.requesting_unit }} · {{ item.place }} ·
+          {{ item.start_at|date:"D, d M Y H:i" }}
+        </li>
+      {% empty %}
+        <li>None</li>
+      {% endfor %}
+    </ul>
+
+    <h2 style="margin:0 0 8px;font-size:16px;">Upcoming approved sessions ({{ upcoming|length }})</h2>
+    <ul style="margin:0;padding-left:20px;">
+      {% for item in upcoming %}
+        <li style="margin-bottom:6px;">
+          <strong>{{ item.title }}</strong> · {{ item.place }} ·
+          {{ item.start_at|date:"D, d M Y H:i" }}
+        </li>
+      {% empty %}
+        <li>None</li>
+      {% endfor %}
+    </ul>
+  </div>
+</body>
+</html>

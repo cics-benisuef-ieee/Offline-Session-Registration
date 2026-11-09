@@ -1,0 +1,54 @@
+{% if form.errors %}
+    <div class="alert alert-danger">
+        <div class="fw-semibold mb-1">Check the series details</div>
+        {{ form.errors }}
+    </div>
+{% endif %}
+
+{% if occurrences %}
+    <div class="card">
+        <div class="card-header">Occurrences</div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                <tr>
+                    <th style="width:2.5rem;">Include</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Status</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for occurrence in occurrences %}
+                    <tr>
+                        <td>
+                            <input class="form-check-input" type="checkbox"
+                                   name="selected_dates"
+                                   value="{{ occurrence.date|date:'Y-m-d' }}"
+                                   {% if occurrence.conflict or not occurrence.is_valid %}disabled{% else %}checked{% endif %}
+                                   aria-label="Include {{ occurrence.date|date:'D, d M Y' }}">
+                        </td>
+                        <td class="text-nowrap">{{ occurrence.date|date:"D, d M Y" }}</td>
+                        <td class="text-nowrap">
+                            {{ occurrence.start_at|date:"H:i" }}–{{ occurrence.end_at|date:"H:i" }}
+                        </td>
+                        <td>
+                            {% if not occurrence.is_valid %}
+                                <span class="badge text-bg-secondary">Unavailable</span>
+                                <span class="small text-muted d-block">{{ occurrence.reason }}</span>
+                            {% elif occurrence.conflict %}
+                                <span class="badge text-bg-warning">Conflict</span>
+                                <span class="small text-muted d-block">{{ occurrence.reason }}</span>
+                            {% else %}
+                                <span class="badge text-bg-success">Available</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% elif not form.errors %}
+    <p class="text-muted mb-0">Preview the series to choose occurrences.</p>
+{% endif %}

@@ -187,6 +187,10 @@ EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="sessions@example.com")
 
+# Shared secret for scheduler-triggered endpoints. Vercel sends it as
+# Authorization: Bearer <CRON_SECRET>; GitHub Actions uses the same value.
+CRON_SECRET = env("CRON_SECRET", default="")
+
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = env.bool("DJANGO_SECURE_COOKIES", default=not DEBUG)

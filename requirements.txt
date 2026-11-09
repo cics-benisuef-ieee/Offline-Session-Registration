@@ -15,17 +15,29 @@ django-crispy-forms==2.7
     #   offline-session-registration
 django-environ==0.14.0
     # via offline-session-registration
+et-xmlfile==2.0.0
+    # via openpyxl
+icalendar==7.3.0
+    # via offline-session-registration
+openpyxl==3.1.5
+    # via offline-session-registration
 psycopg==3.3.8
     # via offline-session-registration
 psycopg-binary==3.3.8 ; implementation_name != 'pypy'
     # via psycopg
+python-dateutil==4.0.0
+    # via icalendar
 sqlparse==0.6.1
     # via django
 typing-extensions==4.16.0 ; python_full_version < '3.13'
-    # via psycopg
-tzdata==2026.6 ; sys_platform == 'win32'
+    # via
+    #   icalendar
+    #   psycopg
+tzdata==2026.6
     # via
     #   django
+    #   icalendar
     #   psycopg
+    #   python-dateutil
 whitenoise==6.12.0
     # via offline-session-registration

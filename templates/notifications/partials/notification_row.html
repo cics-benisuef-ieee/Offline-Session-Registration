@@ -1,0 +1,26 @@
+<div class="notification-row{% if not notification.is_read %} notification-row--unread{% endif %}"
+     id="notification-{{ notification.pk }}">
+    <div class="notification-row-main">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <strong>{{ notification.title }}</strong>
+            {% if not notification.is_read %}
+                <span class="badge text-bg-primary">New</span>
+            {% endif %}
+        </div>
+        <p class="mb-1">{{ notification.body }}</p>
+        <div class="small text-muted">
+            {{ notification.created_at|date:"D, d M Y H:i" }}
+            {% if notification.request and not notification.request.deleted_at %}
+                · <a href="{% url 'request_detail' notification.request.pk %}">View request</a>
+            {% endif %}
+        </div>
+    </div>
+    {% if not notification.is_read %}
+        <form method="post" action="{% url 'notification_read' notification.pk %}"
+              hx-post="{% url 'notification_read' notification.pk %}"
+              hx-target="#notification-{{ notification.pk }}" hx-swap="outerHTML">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Mark read</button>
+        </form>
+    {% endif %}
+</div>

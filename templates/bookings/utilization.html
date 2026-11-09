@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Utilization · CS/CIS Session Registration{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div class="page-title-wrap">
+        <span class="page-title-bar" aria-hidden="true"></span>
+        <div>
+            <h1 class="page-title">Utilization</h1>
+            <p class="page-subtitle">
+                Approved booked minutes by place, weekday, and hour. Closure days are removed from
+                the open-hours denominator.
+            </p>
+        </div>
+    </div>
+    <div class="page-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'reports' %}">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to reports
+        </a>
+    </div>
+</div>
+
+<div class="card filter-card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" for="date_from">From</label>
+                <input class="form-control" type="date" id="date_from" name="date_from" value="{{ date_from_value }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="date_to">To</label>
+                <input class="form-control" type="date" id="date_to" name="date_to" value="{{ date_to_value }}">
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button class="btn btn-brand" type="submit">
+                    <i class="bi bi-funnel" aria-hidden="true"></i> Apply range
+                </button>
+                <a class="btn btn-outline-secondary" href="{% url 'reports_utilization' %}">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="stat-grid stat-grid--three">
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Booked minutes</p>
+            <span class="stat-icon tone-navy" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
+        </div>
+        <p class="stat-value">{{ booked_minutes }}</p>
+        <p class="stat-hint">Approved sessions in the range</p>
+    </div>
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Open minutes</p>
+            <span class="stat-icon tone-gold" aria-hidden="true"><i class="bi bi-calendar-range"></i></span>
+        </div>
+        <p class="stat-value">{{ available_minutes }}</p>
+        <p class="stat-hint">Opening hours minus closure days</p>
+    </div>
+    <div class="stat-card">
+        <div class="stat-head">
+            <p class="stat-label">Utilization</p>
+            <span class="stat-icon tone-green" aria-hidden="true"><i class="bi bi-speedometer2"></i></span>
+        </div>
+        <p class="stat-value">{{ percent }}%</p>
+        <p class="stat-hint">Booked of open minutes</p>
+    </div>
+</div>
+
+{% for place in places %}
+    <div class="card mb-4">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>{{ place.place }}</span>
+            <span class="text-muted small">
+                {{ place.percent }}% utilized · {{ place.booked_minutes }} / {{ place.available_minutes }} min
+            </span>
+        </div>
+        <div class="card-body">
+            {% if place.hours %}
+                <div class="heatmap" style="--heat-cols: {{ place.hours|length }};" role="img"
+                     aria-label="Utilization for {{ place.place }}">
+                    <div class="heatmap-row heatmap-head">
+                        <span class="heatmap-corner" aria-hidden="true"></span>
+                        {% for hour in place.hours %}
+                            <span class="heatmap-hour">{{ hour|stringformat:"02d" }}:00</span>
+                        {% endfor %}
+                    </div>
+                    {% for row in place.rows %}
+                        <div class="heatmap-row">
+                            <span class="heatmap-day">{{ row.label }}</span>
+                            {% for cell in row.cells %}
+                                <span class="heat-cell heat-{{ cell.level }}"
+                                      title="{{ row.label }} {{ cell.label }} — {{ cell.booked }} of {{ cell.available }} min ({{ cell.percent }}%)">
+                                    {{ cell.percent }}%
+                                </span>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <details class="mt-3">
+                    <summary class="small text-muted">View as a table</summary>
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm align-middle mb-0">
+                            <caption class="visually-hidden">Utilization table for {{ place.place }}</caption>
+                            <thead>
+                            <tr>
+                                <th scope="col">Day</th>
+                                {% for hour in place.hours %}
+                                    <th scope="col">{{ hour|stringformat:"02d" }}:00</th>
+                                {% endfor %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in place.rows %}
+                                <tr>
+                                    <th scope="row">{{ row.label }}</th>
+                                    {% for cell in row.cells %}
+                                        <td>{{ cell.percent }}% <span class="text-muted small">({{ cell.booked }}/{{ cell.available }})</span></td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            {% else %}
+                <p class="text-muted mb-0">This place has no open hours configured.</p>
+            {% endif %}
+        </div>
+    </div>
+{% empty %}
+    <div class="card">
+        <div class="card-body text-muted">No active places to report on.</div>
+    </div>
+{% endfor %}
+{% endblock %}

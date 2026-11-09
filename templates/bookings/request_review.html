@@ -64,6 +64,16 @@
                     {% endfor %}
                 </ul>
                 <div class="small mt-2">Approval will be blocked until the conflict is resolved.</div>
+                {% if suggested_slots %}
+                    <div class="small mt-2">
+                        <span class="fw-semibold">Next free window{{ suggested_slots|length|pluralize }}:</span>
+                        {% for slot in suggested_slots %}
+                            <span class="badge text-bg-light border me-1">
+                                {{ slot.date }} {{ slot.start|slice:"11:16" }}–{{ slot.end|slice:"11:16" }}
+                            </span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
         {% else %}
             <div class="alert alert-success">

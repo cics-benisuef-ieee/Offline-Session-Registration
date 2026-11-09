@@ -36,5 +36,6 @@ urlpatterns = [
         ),
         name="password_reset_complete",
     ),
+    path("", include("notifications.urls")),
     path("", include("bookings.urls")),
 ]

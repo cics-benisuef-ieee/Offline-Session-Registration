@@ -10,8 +10,17 @@
         </div>
     </div>
     <div class="page-actions">
+        <a class="btn btn-outline-brand" href="{% url 'reports_utilization' %}">
+            <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Utilization
+        </a>
+        <a class="btn btn-outline-brand" href="{% url 'reports_audit' %}">
+            <i class="bi bi-clock-history" aria-hidden="true"></i> Audit log
+        </a>
         <a class="btn btn-accent" href="{% url 'export_requests_csv' %}{% if querystring %}?{{ querystring }}{% endif %}">
             <i class="bi bi-download" aria-hidden="true"></i> Download CSV
+        </a>
+        <a class="btn btn-accent" href="{% url 'export_requests_xlsx' %}{% if querystring %}?{{ querystring }}{% endif %}">
+            <i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Download XLSX
         </a>
     </div>
 </div>
@@ -111,7 +120,210 @@
     </div>
 </div>
 
+<div class="row g-4 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-head">
+                <p class="stat-label">Approval rate</p>
+                <span class="stat-icon tone-green" aria-hidden="true"><i class="bi bi-graph-up-arrow"></i></span>
+            </div>
+            <p class="stat-value">{{ approval_rate }}%</p>
+            <p class="stat-hint">Approved of decided requests</p>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="stat-card">
+            <div class="stat-head">
+                <p class="stat-label">Avg review time</p>
+                <span class="stat-icon tone-navy" aria-hidden="true"><i class="bi bi-stopwatch"></i></span>
+            </div>
+            <p class="stat-value">{% if avg_review_hours is not None %}{{ avg_review_hours }}h{% else %}—{% endif %}</p>
+            <p class="stat-hint">From submission to decision</p>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header">Requests by month</div>
+            <div class="card-body">
+                <div class="report-chart">
+                    <canvas id="monthlyChart" role="img" aria-label="Requests by month"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header">Status split</div>
+            <div class="card-body">
+                <div class="report-chart">
+                    <canvas id="statusChart" role="img" aria-label="Status split"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">Requests by unit</div>
+            <div class="card-body">
+                <div class="report-chart report-chart--tall">
+                    <canvas id="unitChart" role="img" aria-label="Requests by unit"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">By unit</div>
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                    <tr>
+                        <th>Unit</th>
+                        <th class="text-end">Total</th>
+                        <th class="text-end">Approved</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in per_unit %}
+                        <tr>
+                            <td>{{ row.requesting_unit__name }}</td>
+                            <td class="text-end">{{ row.total }}</td>
+                            <td class="text-end">{{ row.approved }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="3" class="text-muted">No requests match these filters.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">By place</div>
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                    <tr>
+                        <th>Place</th>
+                        <th class="text-end">Total</th>
+                        <th class="text-end">Approved</th>
+                        <th class="text-end">Booked</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in per_place %}
+                        <tr>
+                            <td>{{ row.place__name }}</td>
+                            <td class="text-end">{{ row.total }}</td>
+                            <td class="text-end">{{ row.approved }}</td>
+                            <td class="text-end">{{ row.booked_minutes }} min</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4" class="text-muted">No requests match these filters.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <p class="small text-muted mt-3 mb-0">
-    The CSV contains request IDs, units, places, start and end times, statuses, reviewers, and decision reasons.
+    The CSV and XLSX exports contain request IDs, units, places, start and end times, statuses, reviewers, and decision reasons.
 </p>
+
+{{ charts|json_script:"report-charts" }}
+{% endblock %}
+{% block extra_js %}
+{% load static %}
+<script src="{% static 'js/vendor/chart.umd.min.js' %}"></script>
+<script>
+(function () {
+    const payload = document.getElementById("report-charts");
+    if (!payload || typeof Chart === "undefined") {
+        return;
+    }
+    const data = JSON.parse(payload.textContent);
+    const palette = ["#00629B", "#002855", "#C8A24A", "#2E7D32", "#B3261E", "#6B7280"];
+    const grid = {color: "rgba(0, 40, 85, 0.08)"};
+    const baseOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {legend: {display: false}},
+        scales: {
+            x: {grid: {display: false}},
+            y: {beginAtZero: true, ticks: {precision: 0}, grid: grid},
+        },
+    };
+
+    new Chart(document.getElementById("monthlyChart"), {
+        type: "line",
+        data: {
+            labels: data.monthly.labels,
+            datasets: [
+                {
+                    label: "Total",
+                    data: data.monthly.total,
+                    borderColor: "#00629B",
+                    backgroundColor: "rgba(0, 98, 155, 0.12)",
+                    fill: true,
+                    tension: 0.3,
+                },
+                {
+                    label: "Approved",
+                    data: data.monthly.approved,
+                    borderColor: "#2E7D32",
+                    backgroundColor: "rgba(46, 125, 50, 0.12)",
+                    fill: false,
+                    tension: 0.3,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {legend: {display: true, position: "bottom"}},
+            scales: baseOptions.scales,
+        },
+    });
+
+    new Chart(document.getElementById("statusChart"), {
+        type: "doughnut",
+        data: {
+            labels: data.status.labels,
+            datasets: [{data: data.status.data, backgroundColor: palette, borderWidth: 0}],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {legend: {position: "bottom"}},
+        },
+    });
+
+    new Chart(document.getElementById("unitChart"), {
+        type: "bar",
+        data: {
+            labels: data.units.labels,
+            datasets: [{label: "Requests", data: data.units.data, backgroundColor: "#00629B"}],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: "y",
+            plugins: {legend: {display: false}},
+            scales: {
+                x: {beginAtZero: true, ticks: {precision: 0}, grid: grid},
+                y: {grid: {display: false}},
+            },
+        },
+    });
+})();
+</script>
 {% endblock %}

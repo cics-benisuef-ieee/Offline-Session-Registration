@@ -30,9 +30,15 @@
         {% endif %}
         <a class="nav-link{% if current == 'calendar' %} active{% endif %}" href="{% url 'calendar' %}"
            {% if current == 'calendar' %}aria-current="page"{% endif %}>Calendar</a>
+        <a class="nav-link{% if current == 'notification_list' %} active{% endif %}"
+           href="{% url 'notification_list' %}"
+           {% if current == 'notification_list' %}aria-current="page"{% endif %}>Notifications</a>
+        <a class="nav-link{% if current == 'notification_preferences' %} active{% endif %}"
+           href="{% url 'notification_preferences' %}"
+           {% if current == 'notification_preferences' %}aria-current="page"{% endif %}>Notification settings</a>
         {% if user.is_officer %}
-            <a class="nav-link{% if current == 'reports' %} active{% endif %}" href="{% url 'reports' %}"
-               {% if current == 'reports' %}aria-current="page"{% endif %}>Reports</a>
+            <a class="nav-link{% if current == 'reports' or current == 'reports_audit' or current == 'reports_utilization' %} active{% endif %}" href="{% url 'reports' %}"
+               {% if current == 'reports' or current == 'reports_audit' or current == 'reports_utilization' %}aria-current="page"{% endif %}>Reports</a>
         {% endif %}
         {% if user.is_superuser %}
             <a class="nav-link{% if '/admin/' in request.path %} active{% endif %}" href="/admin/"
