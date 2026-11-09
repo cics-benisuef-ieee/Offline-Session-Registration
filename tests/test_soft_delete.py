@@ -2,7 +2,6 @@ from datetime import timedelta
 from io import StringIO
 
 import pytest
-from django.core import mail
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.management import call_command
 from django.db import connection
@@ -20,6 +19,7 @@ from bookings.services import (
     restore_session_request,
     visible_requests_for,
 )
+from notifications.models import Notification
 
 pytestmark = pytest.mark.django_db
 
@@ -243,7 +243,6 @@ def test_delete_notifies_requester_and_officers_for_approved_sessions(
         session_request = approved_request(
             officer, board_user, place, start_at, end_at
         )
-    mail.outbox.clear()
 
     with django_capture_on_commit_callbacks(execute=True):
         delete_session_request(
@@ -252,10 +251,14 @@ def test_delete_notifies_requester_and_officers_for_approved_sessions(
             reason="Venue unavailable.",
         )
 
-    recipients = {email for message in mail.outbox for email in message.to}
-    assert board_user.email in recipients
-    assert officer.email in recipients
-    assert all("Venue unavailable." in message.body for message in mail.outbox)
+    notifications = Notification.objects.filter(
+        kind=Notification.Kind.DELETION,
+        request=session_request,
+    )
+    recipients = set(notifications.values_list("user_id", flat=True))
+    assert board_user.pk in recipients
+    assert officer.pk in recipients
+    assert all("Venue unavailable." in notification.body for notification in notifications)
 
 
 def test_delete_does_not_notify_for_pending_sessions(
@@ -269,7 +272,6 @@ def test_delete_does_not_notify_for_pending_sessions(
 ):
     with django_capture_on_commit_callbacks(execute=True):
         session_request = make_request(board_user, place, start_at, end_at)
-    mail.outbox.clear()
 
     with django_capture_on_commit_callbacks(execute=True):
         delete_session_request(
@@ -278,7 +280,10 @@ def test_delete_does_not_notify_for_pending_sessions(
             reason="Test row.",
         )
 
-    assert mail.outbox == []
+    assert not Notification.objects.filter(
+        kind=Notification.Kind.DELETION,
+        request=session_request,
+    ).exists()
 
 
 def test_restore_clears_the_deletion_fields(

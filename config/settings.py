@@ -76,6 +76,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "notifications.context_processors.push",
             ],
         },
     },
@@ -175,17 +176,22 @@ LOGOUT_REDIRECT_URL = "login"
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
-EMAIL_BACKEND = env(
-    "EMAIL_BACKEND",
-    default="django.core.mail.backends.console.EmailBackend",
+# Outgoing email is intentionally disabled. Notifications are delivered in-app
+# and through browser Web Push.
+EMAIL_BACKEND = "django.core.mail.backends.dummy.EmailBackend"
+
+# Browser Web Push. Generate keys with:
+#   uv run python manage.py generate_vapid_keys
+# Leave both empty to disable Web Push while keeping in-app notifications.
+VAPID_PUBLIC_KEY = env("VAPID_PUBLIC_KEY", default="")
+VAPID_PRIVATE_KEY = env("VAPID_PRIVATE_KEY", default="")
+_vapid_subject = env("VAPID_SUBJECT", default="mailto:sessions@example.com").strip()
+if _vapid_subject and ":" not in _vapid_subject:
+    _vapid_subject = f"mailto:{_vapid_subject}"
+VAPID_SUBJECT = _vapid_subject
+WEB_PUSH_ENABLED = bool(
+    VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY and VAPID_SUBJECT
 )
-EMAIL_HOST = env("EMAIL_HOST", default="")
-EMAIL_PORT = env.int("EMAIL_PORT", default=587)
-EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
-EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="sessions@example.com")
 
 # Shared secret for scheduler-triggered endpoints. Vercel sends it as
 # Authorization: Bearer <CRON_SECRET>; GitHub Actions uses the same value.

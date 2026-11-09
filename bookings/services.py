@@ -13,6 +13,7 @@ from icalendar import Calendar, Event
 from notifications.services import (
     notify_cancellation,
     notify_decision,
+    notify_decision_summary,
     notify_deletion,
     notify_new_request,
 )
@@ -150,7 +151,7 @@ def create_session_request(
 
 
 @transaction.atomic
-def approve_session_request(*, request_id, reviewer):
+def approve_session_request(*, request_id, reviewer, notify=True):
     if not (reviewer.is_superuser or reviewer.is_officer):
         raise PermissionDenied("Only officers can approve requests.")
 
@@ -186,12 +187,13 @@ def approve_session_request(*, request_id, reviewer):
         changed_by=reviewer,
         reason="Approved",
     )
-    notify_decision(session_request)
+    if notify:
+        notify_decision(session_request)
     return session_request
 
 
 @transaction.atomic
-def reject_session_request(*, request_id, reviewer, reason):
+def reject_session_request(*, request_id, reviewer, reason, notify=True):
     if not (reviewer.is_superuser or reviewer.is_officer):
         raise PermissionDenied("Only officers can reject requests.")
     if not reason.strip():
@@ -222,12 +224,13 @@ def reject_session_request(*, request_id, reviewer, reason):
         changed_by=reviewer,
         reason=reason.strip(),
     )
-    notify_decision(session_request)
+    if notify:
+        notify_decision(session_request)
     return session_request
 
 
 @transaction.atomic
-def cancel_session_request(*, request_id, actor, reason=""):
+def cancel_session_request(*, request_id, actor, reason="", notify=True):
     session_request = SessionRequest.objects.select_for_update().get(pk=request_id)
 
     if not can_cancel_request(actor, session_request):
@@ -250,7 +253,8 @@ def cancel_session_request(*, request_id, actor, reason=""):
         changed_by=actor,
         reason=reason.strip() or "Cancelled",
     )
-    notify_cancellation(session_request)
+    if notify:
+        notify_cancellation(session_request, reason=reason.strip())
     return session_request
 
 
@@ -432,6 +436,7 @@ def bulk_decide(*, request_ids, action, reviewer, reason=""):
         raise ValidationError("A rejection reason is required.")
 
     succeeded = []
+    succeeded_requests = []
     failed = []
     for request_id in request_ids:
         try:
@@ -439,12 +444,14 @@ def bulk_decide(*, request_ids, action, reviewer, reason=""):
                 session_request = approve_session_request(
                     request_id=request_id,
                     reviewer=reviewer,
+                    notify=False,
                 )
             else:
                 session_request = reject_session_request(
                     request_id=request_id,
                     reviewer=reviewer,
                     reason=reason,
+                    notify=False,
                 )
         except SessionRequest.DoesNotExist:
             failed.append({"id": str(request_id), "error": "Request not found."})
@@ -452,6 +459,13 @@ def bulk_decide(*, request_ids, action, reviewer, reason=""):
             failed.append({"id": str(request_id), "error": "; ".join(exc.messages)})
         else:
             succeeded.append(str(session_request.pk))
+            succeeded_requests.append(session_request)
+
+    if succeeded_requests:
+        notify_decision_summary(
+            succeeded_requests,
+            "approved" if action == "approve" else "rejected",
+        )
 
     return {"succeeded": succeeded, "failed": failed}
 

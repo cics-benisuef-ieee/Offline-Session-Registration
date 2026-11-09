@@ -1,14 +1,12 @@
 import logging
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import Q
-from django.template.loader import render_to_string
 from django.utils import timezone
 
-from .models import Notification, NotificationPreference
+from .models import Notification
+from .push import send_push_for_notification
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -16,15 +14,6 @@ User = get_user_model()
 REMINDER_KINDS = {
     Notification.Kind.REMINDER_24H,
     Notification.Kind.REMINDER_2H,
-}
-
-EMAIL_PREFERENCE_BY_KIND = {
-    Notification.Kind.NEW_REQUEST: "email_new_request",
-    Notification.Kind.DECISION: "email_decision",
-    Notification.Kind.DELETION: "email_decision",
-    Notification.Kind.CANCELLATION: "email_cancellation",
-    Notification.Kind.REMINDER_24H: "email_reminder",
-    Notification.Kind.REMINDER_2H: "email_reminder",
 }
 
 
@@ -40,59 +29,23 @@ def _local_window(session_request):
     return start, end
 
 
-def _email_allowed(user, kind):
-    preference = NotificationPreference.for_user(user)
-    if kind == Notification.Kind.DIGEST:
-        return preference.digest_frequency != NotificationPreference.DigestFrequency.OFF
-    field = EMAIL_PREFERENCE_BY_KIND.get(kind)
-    if not field:
-        return False
-    return bool(getattr(preference, field))
+def _unique_users(users):
+    seen = set()
+    for user in users:
+        if user is not None and user.pk not in seen:
+            seen.add(user.pk)
+            yield user
 
 
-def _send_email(*, recipient, subject, text_body, html_body=""):
-    if not recipient:
-        return
-
-    def send():
-        try:
-            message = EmailMultiAlternatives(
-                subject=subject,
-                body=text_body,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[recipient],
-            )
-            if html_body:
-                message.attach_alternative(html_body, "text/html")
-            message.send(fail_silently=False)
-        except Exception:
-            logger.exception("Notification email to %s failed.", recipient)
-
-    transaction.on_commit(send)
+def _status_recipients(session_request):
+    return list(_unique_users([session_request.submitted_by, *_officers()]))
 
 
-def render_email(template_name, context):
-    base = f"notifications/email/{template_name}"
-    text_body = render_to_string(f"{base}.txt", context)
-    html_body = render_to_string(f"{base}.html", context)
-    return text_body, html_body
-
-
-def notify_user(
-    *,
-    user,
-    kind,
-    title,
-    body,
-    request=None,
-    email_subject="",
-    email_text="",
-    email_html="",
-):
-    """Write an in-app notification and optionally schedule its email.
+def notify_user(*, user, kind, title, body, request=None):
+    """Write an in-app notification and schedule a browser push.
 
     Reminder notifications are de-duplicated with ``get_or_create`` so a
-    repeated cron run cannot create a second row or email.
+    repeated cron run cannot create a second row or push.
     """
     created = True
     if kind in REMINDER_KINDS and request is not None:
@@ -111,16 +64,10 @@ def notify_user(
             request=request,
         )
 
-    if (
-        created
-        and email_subject
-        and _email_allowed(user, kind)
-    ):
-        _send_email(
-            recipient=user.email,
-            subject=email_subject,
-            text_body=email_text,
-            html_body=email_html,
+    if created:
+        notification_id = notification.pk
+        transaction.on_commit(
+            lambda: send_push_for_notification(notification_id)
         )
     return notification
 
@@ -142,7 +89,6 @@ def notify_new_request(session_request):
         f"{session_request.requesting_unit} requested {session_request.place} "
         f"from {context['start']:%Y-%m-%d %H:%M} to {context['end']:%H:%M}."
     )
-    text_body, html_body = render_email("new_request", context)
     for officer in _officers():
         notify_user(
             user=officer,
@@ -150,9 +96,6 @@ def notify_new_request(session_request):
             title=title,
             body=body,
             request=session_request,
-            email_subject=title,
-            email_text=text_body,
-            email_html=html_body,
         )
 
 
@@ -170,13 +113,6 @@ def notify_new_series(series):
             f" First: {timezone.localtime(first.start_at):%Y-%m-%d %H:%M}."
             f" Last: {timezone.localtime(last.start_at):%Y-%m-%d %H:%M}."
         )
-    context = {
-        "series": series,
-        "count": count,
-        "first": first,
-        "last": last,
-    }
-    text_body, html_body = render_email("new_series", context)
     for officer in _officers():
         notify_user(
             user=officer,
@@ -184,59 +120,62 @@ def notify_new_series(series):
             title=title,
             body=body,
             request=first,
-            email_subject=title,
-            email_text=text_body,
-            email_html=html_body,
         )
 
 
 def notify_decision(session_request):
     context = _request_context(session_request)
     title = f"Session request {session_request.status}: {session_request.title}"
-    body = (
-        f"Your request for {session_request.place} on "
-        f"{context['start']:%Y-%m-%d %H:%M}–{context['end']:%H:%M} "
-        f"was {session_request.status}."
-    )
-    if session_request.decision_reason:
-        body += f" Reason: {session_request.decision_reason}"
-    if session_request.status == "approved":
-        from bookings.services import google_calendar_url
+    for recipient in _status_recipients(session_request):
+        if recipient.pk == session_request.submitted_by_id:
+            body = (
+                f"Your request for {session_request.place} on "
+                f"{context['start']:%Y-%m-%d %H:%M}–{context['end']:%H:%M} "
+                f"was {session_request.status}."
+            )
+        else:
+            body = (
+                f"{session_request.requesting_unit}'s request for "
+                f"{session_request.place} on "
+                f"{context['start']:%Y-%m-%d %H:%M}–{context['end']:%H:%M} "
+                f"was {session_request.status}."
+            )
+        if session_request.decision_reason:
+            body += f" Reason: {session_request.decision_reason}"
+        notify_user(
+            user=recipient,
+            kind=Notification.Kind.DECISION,
+            title=title,
+            body=body,
+            request=session_request,
+        )
 
-        context["google_calendar_url"] = google_calendar_url(session_request)
 
-    text_body, html_body = render_email("decision", context)
-    notify_user(
-        user=session_request.submitted_by,
-        kind=Notification.Kind.DECISION,
-        title=title,
-        body=body,
-        request=session_request,
-        email_subject=title,
-        email_text=text_body,
-        email_html=html_body,
-    )
-
-
-def notify_cancellation(session_request):
+def notify_cancellation(session_request, *, reason=""):
     context = _request_context(session_request)
     title = f"Session request cancelled: {session_request.title}"
-    body = (
-        f"{session_request.requesting_unit} cancelled the request for "
-        f"{session_request.place} on "
-        f"{context['start']:%Y-%m-%d %H:%M}–{context['end']:%H:%M}."
-    )
-    text_body, html_body = render_email("cancellation", context)
-    for officer in _officers():
+    for recipient in _status_recipients(session_request):
+        if recipient.pk == session_request.submitted_by_id:
+            body = (
+                f"Your request for {session_request.place} on "
+                f"{context['start']:%Y-%m-%d %H:%M}–{context['end']:%H:%M} "
+                f"was cancelled."
+            )
+        else:
+            body = (
+                f"{session_request.requesting_unit}'s request for "
+                f"{session_request.place} on "
+                f"{context['start']:%Y-%m-%d %H:%M}–{context['end']:%H:%M} "
+                f"was cancelled."
+            )
+        if reason:
+            body += f" Reason: {reason}"
         notify_user(
-            user=officer,
+            user=recipient,
             kind=Notification.Kind.CANCELLATION,
             title=title,
             body=body,
             request=session_request,
-            email_subject=title,
-            email_text=text_body,
-            email_html=html_body,
         )
 
 
@@ -248,23 +187,147 @@ def notify_deletion(session_request):
         f"{context['start']:%Y-%m-%d %H:%M}–{context['end']:%H:%M}. "
         f"Reason: {session_request.deletion_reason}"
     )
-    context["deletion_reason"] = session_request.deletion_reason
-    text_body, html_body = render_email("deletion", context)
-    recipients = [session_request.submitted_by, *_officers()]
-    seen = set()
-    for recipient in recipients:
-        if recipient.pk in seen:
-            continue
-        seen.add(recipient.pk)
+    for recipient in _status_recipients(session_request):
         notify_user(
             user=recipient,
             kind=Notification.Kind.DELETION,
             title=title,
             body=body,
             request=session_request,
-            email_subject=title,
-            email_text=text_body,
-            email_html=html_body,
+        )
+
+
+def _summary_message(session_requests, action, *, for_requester, reason=""):
+    first = session_requests[0]
+    count = len(session_requests)
+    plural = "s" if count != 1 else ""
+    place_ids = {item.place_id for item in session_requests}
+    place_label = (
+        str(first.place) if len(place_ids) == 1 else f"{len(place_ids)} places"
+    )
+    same_series = (
+        first.series_id is not None
+        and all(item.series_id == first.series_id for item in session_requests)
+    )
+    if same_series:
+        title = f"Series {action}: {first.series.title}"
+        subject = (
+            "Your recurring series"
+            if for_requester
+            else f"{first.requesting_unit}'s recurring series"
+        )
+        body = (
+            f"{subject} at {place_label} was {action} for "
+            f"{count} occurrence{plural}."
+        )
+    else:
+        title = f"Requests {action}"
+        subject = "Your" if for_requester else f"{first.requesting_unit}'s"
+        verb = "were" if count != 1 else "was"
+        body = (
+            f"{subject} {count} request{plural} at {place_label} "
+            f"{verb} {action}."
+        )
+    if reason:
+        body += f" Reason: {reason}"
+    return title, body
+
+
+def notify_decision_summary(session_requests, action):
+    """Send one decision summary per requester and one to officers."""
+    requests = list(session_requests)
+    if not requests:
+        return
+
+    by_requester = {}
+    for session_request in requests:
+        by_requester.setdefault(
+            session_request.submitted_by_id, []
+        ).append(session_request)
+
+    notified_user_ids = set()
+    for requester_id, requester_requests in by_requester.items():
+        requester = requester_requests[0].submitted_by
+        reason = requester_requests[0].decision_reason
+        title, body = _summary_message(
+            requester_requests,
+            action,
+            for_requester=True,
+            reason=reason,
+        )
+        notify_user(
+            user=requester,
+            kind=Notification.Kind.DECISION,
+            title=title,
+            body=body,
+            request=requester_requests[0],
+        )
+        notified_user_ids.add(requester_id)
+
+    reason = requests[0].decision_reason
+    title, body = _summary_message(
+        requests,
+        action,
+        for_requester=False,
+        reason=reason,
+    )
+    for officer in _officers():
+        if officer.pk in notified_user_ids:
+            continue
+        notify_user(
+            user=officer,
+            kind=Notification.Kind.DECISION,
+            title=title,
+            body=body,
+            request=requests[0],
+        )
+
+
+def notify_cancellation_summary(session_requests, *, reason=""):
+    """Send one cancellation summary per requester and one to officers."""
+    requests = list(session_requests)
+    if not requests:
+        return
+
+    by_requester = {}
+    for session_request in requests:
+        by_requester.setdefault(
+            session_request.submitted_by_id, []
+        ).append(session_request)
+
+    notified_user_ids = set()
+    for requester_id, requester_requests in by_requester.items():
+        requester = requester_requests[0].submitted_by
+        title, body = _summary_message(
+            requester_requests,
+            "cancelled",
+            for_requester=True,
+            reason=reason,
+        )
+        notify_user(
+            user=requester,
+            kind=Notification.Kind.CANCELLATION,
+            title=title,
+            body=body,
+            request=requester_requests[0],
+        )
+        notified_user_ids.add(requester_id)
+
+    title, body = _summary_message(
+        requests,
+        "cancelled",
+        for_requester=False,
+        reason=reason,
+    )
+    for officer in _officers():
+        if officer.pk in notified_user_ids:
+            continue
+        notify_user(
+            user=officer,
+            kind=Notification.Kind.CANCELLATION,
+            title=title,
+            body=body,
+            request=requests[0],
         )
 
 
@@ -275,22 +338,17 @@ def notify_reminder(session_request, *, hours):
         else Notification.Kind.REMINDER_2H
     )
     context = _request_context(session_request)
-    context["hours"] = hours
     title = f"Reminder: {session_request.title} starts in {hours} hours"
     body = (
         f"Your session at {session_request.place} starts on "
         f"{context['start']:%Y-%m-%d %H:%M}."
     )
-    text_body, html_body = render_email("reminder", context)
     return notify_user(
         user=session_request.submitted_by,
         kind=kind,
         title=title,
         body=body,
         request=session_request,
-        email_subject=title,
-        email_text=text_body,
-        email_html=html_body,
     )
 
 
@@ -300,18 +358,9 @@ def notify_digest(user, *, pending, upcoming, frequency):
         f"{len(pending)} pending request(s) and "
         f"{len(upcoming)} upcoming approved session(s)."
     )
-    context = {
-        "pending": pending,
-        "upcoming": upcoming,
-        "frequency": frequency,
-    }
-    text_body, html_body = render_email("digest", context)
     return notify_user(
         user=user,
         kind=Notification.Kind.DIGEST,
         title=title,
         body=body,
-        email_subject=title,
-        email_text=text_body,
-        email_html=html_body,
     )

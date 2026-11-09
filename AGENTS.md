@@ -17,6 +17,7 @@ cp .env.example .env
 uv run python manage.py migrate
 uv run python manage.py seed_units
 uv run python manage.py seed_board_accounts --password "<strong-password>"
+uv run python manage.py generate_vapid_keys
 uv run python manage.py createsuperuser
 uv run python manage.py runserver
 ```
@@ -27,6 +28,13 @@ Quality checks:
 uv run pytest
 uv run pytest tests/test_services.py::test_pending_does_not_block_but_approved_does
 uv run ruff check .
+```
+
+If `.env` points at PostgreSQL, override `DATABASE_URL` with SQLite for tests so Django does not
+create a test database on the shared server:
+
+```bash
+DATABASE_URL=sqlite:////tmp/session-registration-test.sqlite3 uv run pytest
 ```
 
 Regenerate the production requirements export after dependency changes:
@@ -46,9 +54,10 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 - `bookings`: `SessionRequest` (UUID), `BookingSeries`, `RequestStatusHistory`, service layer
   (`services.py` for requests, `series.py` for recurring series), reporting/analytics
   (`reports.py`), forms, views.
-- `notifications`: in-app notifications, per-user preferences, reminder and digest
-  scheduling, and email templates; sends are deferred with `transaction.on_commit()`.
-- `templates/notifications/`: notification center, preferences, and email templates.
+- `notifications`: in-app notifications, per-user digest preferences, reminder and digest
+  scheduling, and browser Web Push (`push.py`, `PushSubscription`); push sends are deferred with
+  `transaction.on_commit()`. Outgoing email is disabled with Django's dummy backend.
+- `templates/notifications/`: notification center and preferences.
 - `templates/`: Django templates using Bootstrap 5, HTMX, Alpine.js, FullCalendar.
 - `static/css/theme.css`: CS/CIS chapter palette and shared UI styles.
 
@@ -76,8 +85,14 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
 - Utilization percentages are computed from approved sessions split into 30-minute slots. The
   denominator is the place's open minutes for each weekday/hour in the range, minus `PlaceClosure`
   days, and booked minutes are capped so the percentage never exceeds 100.
-- In-app notifications are always written. Email delivery is gated by `NotificationPreference`;
-  a suppressed email must not suppress the in-app row.
+- In-app notifications are always written. Email delivery is disabled; a missing or failing push
+  subscription must not suppress the in-app row.
+- Approval, rejection, and cancellation notify the requester plus active officers/admins,
+  deduplicated. Bulk and series actions send one summary notification per recipient.
+- Browser push uses VAPID (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) and the
+  `/sw.js` service worker. Stale `404`/`410` subscriptions are deleted. Push is skipped when the
+  keys are unset.
+- Password reset is admin-only; password-reset email routes and templates are intentionally absent.
 - Reminder sends are idempotent: `reminder_24h_sent_at` / `reminder_2h_sent_at` on the request and
   a unique `(user, request, kind)` constraint on reminder notifications guard repeated cron runs.
 - Only approved, non-deleted, future sessions receive reminders. The digest includes pending
@@ -107,6 +122,9 @@ uv export --no-dev --format requirements-txt --no-hashes --no-emit-project -o re
   `.github/workflows/reminders.yml` every 15 minutes against `/cron/reminders/`.
 - `CRON_SECRET` must match between Vercel and the GitHub Actions repository secret. Vercel sends
   the header automatically; the workflow sends it explicitly.
+- Browser Web Push requires HTTPS and the `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and
+  `VAPID_SUBJECT` environment variables. Generate the keys with
+  `manage.py generate_vapid_keys`; leave them unset to disable push without affecting in-app rows.
 - Do not add long-running workers or rely on in-memory state across function invocations.
 
 ## Working here

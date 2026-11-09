@@ -68,10 +68,6 @@ class NotificationPreference(models.Model):
         on_delete=models.CASCADE,
         related_name="notification_preference",
     )
-    email_new_request = models.BooleanField(default=True)
-    email_decision = models.BooleanField(default=True)
-    email_cancellation = models.BooleanField(default=True)
-    email_reminder = models.BooleanField(default=True)
     digest_frequency = models.CharField(
         max_length=10,
         choices=DigestFrequency.choices,
@@ -87,3 +83,29 @@ class NotificationPreference(models.Model):
     def for_user(cls, user):
         preference, _ = cls.objects.get_or_create(user=user)
         return preference
+
+
+class PushSubscription(models.Model):
+    """A browser Web Push subscription for one user and device."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="push_subscriptions",
+    )
+    endpoint = models.URLField(max_length=500, unique=True)
+    p256dh = models.CharField(max_length=200)
+    auth = models.CharField(max_length=100)
+    user_agent = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Push subscription for {self.user}"
+
+    def mark_used(self):
+        self.last_used_at = timezone.now()
+        self.save(update_fields=["last_used_at"])

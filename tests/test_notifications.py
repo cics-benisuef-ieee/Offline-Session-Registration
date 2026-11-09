@@ -7,6 +7,7 @@ from bookings.services import (
     create_session_request,
     reject_session_request,
 )
+from notifications.models import Notification
 
 pytestmark = pytest.mark.django_db
 
@@ -18,52 +19,59 @@ def make_request(user, place, start_at, end_at):
         start_at=start_at,
         end_at=end_at,
         title="Notification test",
-        purpose="Check transactional email.",
+        purpose="Check in-app notifications.",
     )
 
 
-def test_new_request_notifies_officers(
-    django_capture_on_commit_callbacks, board_user, officer, place, start_at, end_at
+def test_new_request_notifies_officers_without_email(
+    board_user, officer, place, start_at, end_at
 ):
-    with django_capture_on_commit_callbacks(execute=True):
-        make_request(board_user, place, start_at, end_at)
+    session_request = make_request(board_user, place, start_at, end_at)
 
-    assert len(mail.outbox) == 1
-    assert mail.outbox[0].to == [officer.email]
+    assert Notification.objects.filter(
+        user=officer,
+        kind=Notification.Kind.NEW_REQUEST,
+        request=session_request,
+    ).exists()
+    assert mail.outbox == []
 
 
-def test_decision_notifies_requester(
-    django_capture_on_commit_callbacks, board_user, officer, place, start_at, end_at
+def test_decision_notifies_requester_and_officers_without_email(
+    board_user, officer, place, start_at, end_at
 ):
-    with django_capture_on_commit_callbacks(execute=True):
-        request = make_request(board_user, place, start_at, end_at)
-    mail.outbox.clear()
+    request = make_request(board_user, place, start_at, end_at)
 
-    with django_capture_on_commit_callbacks(execute=True):
-        reject_session_request(
-            request_id=request.pk,
-            reviewer=officer,
-            reason="Not available",
-        )
+    reject_session_request(
+        request_id=request.pk,
+        reviewer=officer,
+        reason="Not available",
+    )
 
-    assert len(mail.outbox) == 1
-    assert mail.outbox[0].to == [board_user.email]
+    for user in (board_user, officer):
+        assert Notification.objects.filter(
+            user=user,
+            kind=Notification.Kind.DECISION,
+            request=request,
+        ).exists()
+    assert mail.outbox == []
 
 
-def test_cancellation_notifies_officers(
-    django_capture_on_commit_callbacks, board_user, officer, place, start_at, end_at
+def test_cancellation_notifies_requester_and_officers_without_email(
+    board_user, officer, place, start_at, end_at
 ):
-    with django_capture_on_commit_callbacks(execute=True):
-        request = make_request(board_user, place, start_at, end_at)
-        approve_session_request(request_id=request.pk, reviewer=officer)
-    mail.outbox.clear()
+    request = make_request(board_user, place, start_at, end_at)
+    approve_session_request(request_id=request.pk, reviewer=officer)
 
-    with django_capture_on_commit_callbacks(execute=True):
-        cancel_session_request(
-            request_id=request.pk,
-            actor=board_user,
-            reason="Schedule changed",
-        )
+    cancel_session_request(
+        request_id=request.pk,
+        actor=board_user,
+        reason="Schedule changed",
+    )
 
-    assert len(mail.outbox) == 1
-    assert mail.outbox[0].to == [officer.email]
+    for user in (board_user, officer):
+        assert Notification.objects.filter(
+            user=user,
+            kind=Notification.Kind.CANCELLATION,
+            request=request,
+        ).exists()
+    assert mail.outbox == []

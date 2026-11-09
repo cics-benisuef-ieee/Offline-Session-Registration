@@ -3,7 +3,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.conf import settings
-from django.core import mail
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.urls import reverse
 from django.utils import timezone
@@ -18,6 +17,7 @@ from bookings.series import (
     reschedule_series_future,
 )
 from bookings.services import approve_session_request, create_session_request
+from notifications.models import Notification
 
 pytestmark = pytest.mark.django_db
 
@@ -174,8 +174,11 @@ def test_create_series_only_creates_selected_occurrences(
     assert [item.series_index for item in created] == [0, 1]
     assert all(item.status == SessionRequest.Status.PENDING for item in created)
     assert series.until_date == occurrences[2]["date"]
-    assert len(mail.outbox) == 1
-    assert mail.outbox[0].to == [officer.email]
+    assert Notification.objects.filter(
+        user=officer,
+        kind=Notification.Kind.NEW_REQUEST,
+        request=created[0],
+    ).exists()
 
 
 def test_create_series_rejects_a_conflicting_selection(

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Notification, NotificationPreference
+from .models import Notification, NotificationPreference, PushSubscription
 
 
 @admin.register(Notification)
@@ -14,14 +14,29 @@ class NotificationAdmin(admin.ModelAdmin):
 
 @admin.register(NotificationPreference)
 class NotificationPreferenceAdmin(admin.ModelAdmin):
-    list_display = [
-        "user",
-        "email_new_request",
-        "email_decision",
-        "email_cancellation",
-        "email_reminder",
-        "digest_frequency",
-    ]
+    list_display = ["user", "digest_frequency"]
     list_filter = ["digest_frequency"]
     search_fields = ["user__email"]
     autocomplete_fields = ["user"]
+
+
+@admin.register(PushSubscription)
+class PushSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ["user", "created_at", "last_used_at"]
+    search_fields = ["user__email"]
+    autocomplete_fields = ["user"]
+    readonly_fields = [
+        "user",
+        "endpoint",
+        "p256dh",
+        "auth",
+        "user_agent",
+        "created_at",
+        "last_used_at",
+    ]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

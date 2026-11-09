@@ -4,7 +4,6 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.conf import settings
-from django.core import mail
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.urls import reverse
 from icalendar import Calendar
@@ -17,6 +16,7 @@ from bookings.services import (
     google_calendar_url,
     reschedule_session_request,
 )
+from notifications.models import Notification
 
 pytestmark = pytest.mark.django_db
 
@@ -74,19 +74,21 @@ def test_google_calendar_link_only_appears_for_approved_requests(
     assert b"Download .ics" in approved.content
 
 
-def test_approval_email_contains_google_calendar_link(
+def test_approval_creates_in_app_notification_without_email(
     django_capture_on_commit_callbacks, board_user, officer, place, start_at, end_at
 ):
     with django_capture_on_commit_callbacks(execute=True):
         session_request = make_request(board_user, place, start_at, end_at)
-    mail.outbox.clear()
 
     with django_capture_on_commit_callbacks(execute=True):
         approve_session_request(request_id=session_request.pk, reviewer=officer)
 
-    assert len(mail.outbox) == 1
-    assert "calendar.google.com" in mail.outbox[0].body
-    assert "action=TEMPLATE" in mail.outbox[0].body
+    for user in (board_user, officer):
+        assert Notification.objects.filter(
+            user=user,
+            kind=Notification.Kind.DECISION,
+            request=session_request,
+        ).exists()
 
 
 def test_calendar_events_pending_overlay_is_officer_only(

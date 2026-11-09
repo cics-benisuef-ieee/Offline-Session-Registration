@@ -103,15 +103,10 @@ def test_notification_preferences_get_and_update(client, board_user):
     response = client.post(
         reverse("notification_preferences"),
         {
-            "email_decision": "on",
-            "email_cancellation": "on",
-            "email_reminder": "on",
             "digest_frequency": NotificationPreference.DigestFrequency.WEEKLY,
         },
     )
 
     assert response.status_code == 302
     preference = NotificationPreference.objects.get(user=board_user)
-    assert preference.email_new_request is False
-    assert preference.email_decision is True
     assert preference.digest_frequency == NotificationPreference.DigestFrequency.WEEKLY

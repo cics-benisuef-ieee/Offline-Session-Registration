@@ -8,8 +8,8 @@
         <div>
             <h1 class="page-title">Notification settings</h1>
             <p class="page-subtitle">
-                In-app notifications are always on. Choose which emails you receive and how often the
-                officer digest arrives.
+                In-app notifications are always on. Browser notifications are optional and
+                work even when this site is closed.
             </p>
         </div>
     </div>
@@ -24,6 +24,7 @@
     <div class="col-lg-7">
         <div class="card">
             <div class="card-body p-4">
+                <h2 class="h5 mb-3">Officer digest</h2>
                 <form method="post" novalidate>
                     {% csrf_token %}
                     {{ form|crispy }}
@@ -31,6 +32,36 @@
                         <i class="bi bi-check2" aria-hidden="true"></i> Save preferences
                     </button>
                 </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-body p-4">
+                <h2 class="h5 mb-2">Browser notifications</h2>
+                <p class="text-muted mb-3">
+                    Get a desktop or mobile notification when a session is approved,
+                    rejected, cancelled, or coming up.
+                </p>
+                <p class="mb-3" data-push-status>
+                    {% if WEB_PUSH_ENABLED %}
+                        Checking browser support…
+                    {% else %}
+                        Browser notifications are not configured on this server.
+                    {% endif %}
+                </p>
+                <button type="button" class="btn btn-brand" data-push-enable hidden>
+                    <i class="bi bi-bell-fill" aria-hidden="true"></i>
+                    Enable browser notifications
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-push-disable hidden>
+                    Disable on this device
+                </button>
+                {% if WEB_PUSH_ENABLED %}
+                    <p class="small text-muted mt-3 mb-0">
+                        On iPhone and iPad, add this site to your Home Screen first, then
+                        enable notifications from there.
+                    </p>
+                {% endif %}
             </div>
         </div>
     </div>

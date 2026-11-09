@@ -81,13 +81,6 @@ def test_logout_redirects_to_login(client, board_user):
     assert b"You have been signed out." in response.content
 
 
-def test_password_reset_page_renders(client):
-    response = client.get(reverse("password_reset"))
-
-    assert response.status_code == 200
-    assert b"Reset your password" in response.content
-
-
 def test_dashboard_and_request_list_render(client, board_user, place, start_at, end_at):
     make_request(board_user, place, start_at, end_at)
     client.force_login(board_user)

@@ -1,9 +1,0 @@
-New session request: {{ session_request.title }}
-
-{{ session_request.requesting_unit }} requested {{ session_request.place }} from
-{{ start|date:"D, d M Y H:i" }} to {{ end|date:"H:i" }}.
-
-Purpose: {{ session_request.purpose }}
-
-Review the request in the session booking app.
-Request ID: {{ request_id }}

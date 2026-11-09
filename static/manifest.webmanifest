@@ -1,0 +1,16 @@
+{
+    "name": "CS/CIS Session Registration",
+    "short_name": "Session Booking",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#002855",
+    "icons": [
+        {
+            "src": "/static/images/logo.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        }
+    ]
+}

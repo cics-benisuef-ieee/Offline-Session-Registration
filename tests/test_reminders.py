@@ -75,9 +75,7 @@ def test_24h_reminder_is_sent_once(
         first = send_due_reminders(now=now)
 
     assert first == {"sent": 1, "skipped": 0}
-    assert len(mail.outbox) == 1
-    assert mail.outbox[0].to == [board_user.email]
-    assert "24 hours" in mail.outbox[0].subject
+    assert mail.outbox == []
 
     session_request.refresh_from_db()
     assert session_request.reminder_24h_sent_at is not None
@@ -90,7 +88,6 @@ def test_24h_reminder_is_sent_once(
         == 1
     )
 
-    mail.outbox.clear()
     with django_capture_on_commit_callbacks(execute=True):
         second = send_due_reminders(now=now)
 
@@ -122,15 +119,13 @@ def test_2h_reminder_fires_independently_of_the_24h_one(
     session_request.refresh_from_db()
     assert session_request.reminder_24h_sent_at is not None
     assert session_request.reminder_2h_sent_at is None
-    mail.outbox.clear()
 
     two_hours_out = now + timedelta(hours=10)
     with django_capture_on_commit_callbacks(execute=True):
         result = send_due_reminders(now=two_hours_out)
 
     assert result == {"sent": 1, "skipped": 0}
-    assert len(mail.outbox) == 1
-    assert "2 hours" in mail.outbox[0].subject
+    assert mail.outbox == []
 
     session_request.refresh_from_db()
     assert session_request.reminder_2h_sent_at is not None
@@ -143,7 +138,7 @@ def test_2h_reminder_fires_independently_of_the_24h_one(
     )
 
 
-def test_reminder_email_preference_suppresses_email_but_not_in_app_row(
+def test_reminder_creates_in_app_notification(
     django_capture_on_commit_callbacks,
     officer,
     board_user,
@@ -154,10 +149,6 @@ def test_reminder_email_preference_suppresses_email_but_not_in_app_row(
     now = fixed_now()
     session_request = approved_request(officer, board_user, place, start_at, end_at)
     move_to(session_request, now=now, hours=12)
-    preference = NotificationPreference.for_user(board_user)
-    preference.email_reminder = False
-    preference.save(update_fields=["email_reminder"])
-    mail.outbox.clear()
 
     with django_capture_on_commit_callbacks(execute=True):
         result = send_due_reminders(now=now)
@@ -267,14 +258,12 @@ def test_digest_sends_to_daily_officers(
     django_capture_on_commit_callbacks, officer, board_user, place, start_at, end_at
 ):
     make_request(board_user, place, start_at, end_at, title="Pending digest item")
-    mail.outbox.clear()
 
     with django_capture_on_commit_callbacks(execute=True):
         result = send_officer_digest(now=fixed_now())
 
     assert result == {"sent": 1, "skipped": 0}
-    assert len(mail.outbox) == 1
-    assert mail.outbox[0].to == [officer.email]
+    assert mail.outbox == []
     assert Notification.objects.filter(
         user=officer, kind=Notification.Kind.DIGEST
     ).exists()
@@ -317,7 +306,7 @@ def test_weekly_digest_only_sends_on_monday(
     with django_capture_on_commit_callbacks(execute=True):
         monday_result = send_officer_digest(now=monday)
     assert monday_result == {"sent": 1, "skipped": 0}
-    assert len(mail.outbox) == 1
+    assert mail.outbox == []
 
 
 def test_send_officer_digest_command_reports_counts(

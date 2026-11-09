@@ -20,6 +20,11 @@
                 </button>
             </form>
         {% endif %}
+        {% if WEB_PUSH_ENABLED %}
+            <button type="button" class="btn btn-outline-brand" data-push-enable hidden>
+                <i class="bi bi-bell-fill" aria-hidden="true"></i> Enable browser alerts
+            </button>
+        {% endif %}
         <a class="btn btn-outline-secondary" href="{% url 'notification_preferences' %}">
             <i class="bi bi-sliders" aria-hidden="true"></i> Preferences
         </a>

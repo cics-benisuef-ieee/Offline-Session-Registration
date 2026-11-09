@@ -6,7 +6,10 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
-from notifications.services import notify_new_series
+from notifications.services import (
+    notify_cancellation_summary,
+    notify_new_series,
+)
 
 from .models import BookingSeries, RequestStatusHistory, SessionRequest
 from .services import (
@@ -363,13 +366,15 @@ def cancel_series(
         )
 
     succeeded = []
+    cancelled_requests = []
     failed = []
     for session_request in occurrences.select_for_update().order_by("start_at"):
         try:
-            cancel_session_request(
+            cancelled = cancel_session_request(
                 request_id=session_request.pk,
                 actor=actor,
                 reason=reason,
+                notify=False,
             )
         except (PermissionDenied, ValidationError) as exc:
             failed.append(
@@ -380,6 +385,10 @@ def cancel_series(
             )
         else:
             succeeded.append(str(session_request.pk))
+            cancelled_requests.append(cancelled)
+
+    if cancelled_requests:
+        notify_cancellation_summary(cancelled_requests, reason=reason.strip())
 
     return {"succeeded": succeeded, "failed": failed}
 

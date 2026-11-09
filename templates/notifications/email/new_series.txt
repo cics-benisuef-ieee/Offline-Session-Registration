@@ -1,7 +1,0 @@
-New recurring series: {{ series.title }}
-
-{{ series.requesting_unit }} requested {{ count }} {{ series.get_frequency_display|lower }} session(s) at {{ series.place }}.
-{% if first %}First session: {{ first.start_at|date:"D, d M Y H:i" }}
-Last session: {{ last.start_at|date:"D, d M Y H:i" }}{% endif %}
-
-Review the occurrences in the session booking app.
